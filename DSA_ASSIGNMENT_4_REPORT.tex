@@ -1,0 +1,236 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper, margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue
+}
+
+\title{
+    \textbf{IC253 \textemdash{} Data Structures and Algorithms} \\
+    \vspace{4pt}
+    \large{Assignment 4 Report}
+}
+\author{Daksh Rathi}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\vspace{-1.5em}
+\hrule
+\vspace{1em}
+
+\noindent
+\textbf{Course:} IC253 \textemdash{} Data Structures and Algorithms \\
+\textbf{Tasks:}
+Task 1 \textemdash{} Smart City Road Network Optimizer,
+Task 2 \textemdash{} Logistics Dispatch Centre. \\
+\textbf{Language:} C++17 (no external libraries beyond the C++ Standard Library).
+
+\vspace{0.5em}
+\hrule
+\vspace{1.5em}
+
+% =====================================================================
+\section{Task 1 \textemdash{} Smart City Road Network Optimizer}
+% =====================================================================
+
+\subsection{Problem Description}
+
+The city is modelled as an undirected weighted graph with \(N\) intersections
+and \(M\) roads. Every road carries two weights: a construction cost (used
+for the MST) and a travel time (used for the shortest path). The class
+implements graph validation, MST construction, shortest-path computation,
+MST-vs-shortest-path comparison, and critical-road analysis.
+
+\subsection{Approach}
+
+\paragraph{Validation policy.} Five rules are enforced inside
+\texttt{validateGraph}: no self-loops, no duplicate roads, non-negative
+weights, valid node ids in \([0, N-1]\), and connectivity (checked by a BFS
+from node 0). The first failing rule rejects the input with a specific reason.
+
+\paragraph{MST.} \texttt{buildMST} uses Kruskal's algorithm: edges are
+sorted by construction cost using a selection sort over edge indices, and a
+DSU (with path compression and union by size) processes them in order. An
+edge is accepted if its endpoints lie in different components and rejected
+otherwise. The running MST cost is printed after every acceptance.
+
+\paragraph{Shortest path.} \texttt{shortestPath} runs Dijkstra's algorithm
+on the full graph (weighted by travel time) in the simple \(O(N^{2})\) form
+that picks the next node by linearly scanning the distance array. The path
+is reconstructed using a predecessor array and the per-hop travel time is
+printed.
+
+\paragraph{Comparison.} \texttt{compareNetworks} runs Dijkstra a second
+time on the MST-only adjacency chain and reports the difference (absolute
+and percentage) against the optimal shortest-path travel time.
+
+\paragraph{Critical roads.} \texttt{criticalRoads} removes each MST edge in
+turn, rebuilds the MST without it, and reports either that the graph
+becomes disconnected, that the MST cost increases, or that a same-cost
+alternative exists.
+
+\subsection{Data Structures}
+
+\begin{itemize}[leftmargin=2em, itemsep=2pt]
+    \item \texttt{Edge} \textemdash{} struct holding \texttt{u, v, cost, travelTime}.
+    \item \texttt{vector<Edge> edges, mstEdges}.
+    \item \texttt{vector<vector<pair<int,int>{>}{>} adjFull, adjMST} \textemdash{} adjacency chains weighted by travel time.
+    \item DSU arrays \texttt{parent[], setSize[]} \textemdash{} reused across the build call and the rebuild loop inside \texttt{criticalRoads}.
+\end{itemize}
+
+\subsection{Time and Space Complexity}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Operation} & \textbf{Time} & \textbf{Space} \\
+\midrule
+\texttt{validateGraph()} & \(O(M^{2} + N + M)\) & \(O(N + M)\) \\
+\texttt{buildMST()} (Kruskal's) & \(O(M^{2})\) & \(O(N + M)\) \\
+\texttt{shortestPath()} (Dijkstra, \(O(N^{2})\) form) & \(O(N^{2} + M)\) & \(O(N)\) \\
+\texttt{compareNetworks()} & \(O(N^{2} + M)\) & \(O(N)\) \\
+\texttt{criticalRoads()} & \(O(E \cdot M^{2})\) & \(O(N + M)\) \\
+\bottomrule
+\end{tabular}
+\caption{Task 1 \textemdash{} \(E = N - 1\) is the number of MST edges. The \(O(M^{2})\) factor in \texttt{buildMST} comes from the selection sort on edge indices.}
+\end{table}
+
+\subsection{Test Case Demonstrations}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\linewidth}{\centering \vspace{2cm} \emph{[Insert screenshot of Test Case 1 output here]} \vspace{2cm}}}
+\caption{Test Case 1 \textemdash{} 6 intersections, 9 roads. MST cost = 13, shortest \(0 \to 5\) travel time = 9, MST path slower by 111.1\%, all 5 MST edges critical.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\linewidth}{\centering \vspace{2cm} \emph{[Insert screenshot of Test Case 2 output here]} \vspace{2cm}}}
+\caption{Test Case 2 \textemdash{} 4 intersections, 5 roads. MST cost = 19, shortest \(0 \to 3\) travel time = 3, MST path slower by 166.7\%, all 3 MST edges critical.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\linewidth}{\centering \vspace{1.5cm} \emph{[Insert screenshot of Test Case 3 output here]} \vspace{1.5cm}}}
+\caption{Test Case 3 \textemdash{} Invalid graph (self-loop), rejected by rule (1).}
+\end{figure}
+
+\newpage
+
+% =====================================================================
+\section{Task 2 \textemdash{} Logistics Dispatch Centre}
+% =====================================================================
+
+\subsection{Problem Description}
+
+A relief centre receives \(N\) aid requests, each with a unique
+\texttt{requestID}, a priority in \([0, 100]\), and a submission timestamp.
+The class supports a live max-heap dispatch queue with priority updates
+and a top-k peek that does not modify the live heap, plus an in-place
+randomised quicksort for shift-end record sorting on either field.
+
+\subsection{Approach}
+
+\paragraph{Data handling policy.} Duplicate IDs and out-of-range priorities
+are rejected at input time with the offending value printed.
+\texttt{updatePriority} additionally rejects unknown IDs and out-of-range
+new priorities, leaving the heap unchanged in either case.
+
+\paragraph{Live queue.} A hand-written max-heap is kept inside a
+\texttt{vector<Request>} using the standard array indexing
+(parent \(= (i-1)/2\), left \(= 2i+1\), right \(= 2i+2\)). The heap is
+built using bottom-up heapify (Floyd's algorithm) in \(O(n)\) overall.
+\texttt{dispatchNext} extracts the root, replaces it with the last element,
+and sifts down. \texttt{updatePriority} locates the request by linear
+scan, overwrites the priority, and sifts up or down depending on the change.
+
+\paragraph{Sorting.} \texttt{sortRecords} implements randomised quicksort
+with Lomuto partitioning: a random pivot is moved to \texttt{arr[hi]},
+elements are partitioned around it, and the two halves are recursed on.
+The sort is fully in-place; the only auxiliary space is the recursion
+stack \(O(\log n)\). A fixed seed is used so the trace is reproducible.
+
+\paragraph{Top-k.} \texttt{topKRequests(k)} copies \texttt{heap[]} into a
+local buffer and runs \(k\) extract-max operations on the copy. The live
+heap is never touched.
+
+\subsection{Data Structures}
+
+\begin{itemize}[leftmargin=2em, itemsep=2pt]
+    \item \texttt{Request} \textemdash{} struct with \texttt{requestID, priority, timestamp}.
+    \item \texttt{vector<Request> heap} \textemdash{} the array-based max-heap.
+\end{itemize}
+
+\subsection{Time and Space Complexity}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Operation} & \textbf{Time} & \textbf{Space} \\
+\midrule
+\texttt{validateInput()} & \(O(n^{2})\) & \(O(1)\) \\
+\texttt{buildStructure()} (bottom-up heapify) & \(O(n)\) & \(O(n)\) (heap) \\
+\texttt{dispatchNext()} & \(O(\log n)\) & \(O(1)\) \\
+\texttt{updatePriority()} & \(O(n)\) (scan) \(+ O(\log n)\) (sift) & \(O(1)\) \\
+\texttt{sortRecords()} (randomised quicksort) & \(O(n \log n)\) avg, \(O(n^{2})\) worst & \(O(\log n)\) auxiliary \\
+\texttt{topKRequests(k)} & \(O(n + k \log n)\) & \(O(n)\) (temp copy) \\
+\bottomrule
+\end{tabular}
+\caption{Task 2. The \(O(\log n)\) auxiliary space for \texttt{sortRecords} comes solely from the recursion stack; no auxiliary arrays of size n are allocated.}
+\end{table}
+
+\subsection{Test Case Demonstrations}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\linewidth}{\centering \vspace{2cm} \emph{[Insert screenshot of Test Case 1 output here]} \vspace{2cm}}}
+\caption{Test Case 1 \textemdash{} six requests. Two dispatches (IDs 104, 102), one ``up'' update on ID 103, one ``down'' update on ID 106, top-3 = \{103, 105, 101\}, plus quicksort traces by both \texttt{priority} and \texttt{timestamp}.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\linewidth}{\centering \vspace{2cm} \emph{[Insert screenshot of Test Case 2 output here]} \vspace{2cm}}}
+\caption{Test Case 2 \textemdash{} five requests. Demonstrates a valid \texttt{updatePriority(203, 88)} as well as two invalid \texttt{updatePriority} calls (unknown ID 999 and out-of-range priority 250) that are correctly rejected.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\linewidth}{\centering \vspace{1.5cm} \emph{[Insert screenshot of Test Case 3 output here]} \vspace{1.5cm}}}
+\caption{Test Case 3 \textemdash{} Invalid input (duplicate ID 301), rejected at validation.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.85\linewidth}{\centering \vspace{1.5cm} \emph{[Insert screenshot of Test Case 4 output here]} \vspace{1.5cm}}}
+\caption{Test Case 4 \textemdash{} Invalid input (priority = 150 on request 402), rejected at validation.}
+\end{figure}
+
+\newpage
+
+\section*{GitHub Repository}
+
+The complete source code, READMEs, and output screenshots for both tasks
+are available at:
+
+\begin{center}
+\url{https://github.com/dakshrathi-india/DSA-ASSIGNMENT-4}
+\end{center}
+
+\end{document}
