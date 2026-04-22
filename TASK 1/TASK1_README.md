@@ -275,17 +275,6 @@ shortest path from node 0 to node 3 has travel time = **3**, while the MST
 path takes **8** units — the MST path is **166.7% slower**. All 3 MST edges
 are critical.
 
-### Test Case 3 — `shortestPath` called **before** `buildMST`
-Validates successfully. `shortestPath(0, 4)` is invoked **first** and
-correctly returns the path `0 -> 2 -> 4` with total travel time 3. Only
-after that is `buildMST()` called, followed by `compareNetworks(0, 4)` and
-`criticalRoads()`. This test case demonstrates that the shortest-path
-operation on the full graph is independent of MST construction.
-
-### Test Case 4 — Invalid graph (self-loop)
-The input contains the edge `(0, 0)`. Rule (1) flags it immediately and the
-graph is rejected without any further processing.
-
 ---
 
 ## Project Structure

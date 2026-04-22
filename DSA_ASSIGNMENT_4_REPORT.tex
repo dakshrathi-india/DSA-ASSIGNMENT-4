@@ -1,399 +1,278 @@
-\documentclass[11pt,a4paper]{article}
 
-\usepackage[a4paper, margin=1in]{geometry}
-\usepackage{amsmath, amssymb}
-\usepackage{graphicx}
-\usepackage{caption}
-\usepackage{subcaption}
-\usepackage{float}
-\usepackage{hyperref}
-\usepackage{booktabs}
+\documentclass[10pt,a4paper]{article}
+\usepackage[a4paper,margin=0.9in]{geometry}
 \usepackage{array}
-\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{url}
+\usepackage{caption}
+\usepackage[T1]{fontenc}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.35em}
+\renewcommand{\arraystretch}{1.08}
 
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    urlcolor=blue
-}
-
-\title{
-    IC253: Data Structures and Algorithm \\
-    Assignment 4 Report
-}
-\author{Name: Daksh Rathi \\ Roll No: B25132}
-\date{}
+\newcommand{\placeholderbox}[2]{%
+\begin{minipage}[t]{0.47\textwidth}
+\centering
+\fbox{\parbox[c][4.0cm][c]{0.88\linewidth}{\centering\small #1}}
+\\[0.25em]
+{\small #2}
+\end{minipage}}
 
 \begin{document}
-
-\maketitle
-
 \thispagestyle{empty}
 
-% =====================================================================
+\begin{center}
+\vspace*{0.55cm}
+{\LARGE \textbf{IC253: Data Structures and Algorithm}}\\[0.35em]
+{\Large Assignment 4 Report}\\[0.85em]
+{\large \textbf{Name:} Daksh Rathi}\\[0.2em]
+{\large \textbf{Roll No:} B25132}
+\end{center}
+
+\vspace{1.1cm}
+
 \section{Introduction}
-% =====================================================================
+This report presents the implementation of both tasks of Assignment 4. Task 1 implements a smart-city road network system using the class \texttt{CityGraph}, while Task 2 implements a logistics dispatch system using the class \texttt{DispatchCentre}. The report summarizes the validation and handling policies, the main data structures, the overall implementation approach, the important functions used in the code, the time and space complexity of the operations, and the selected hardcoded test-case outputs used for report presentation.
 
-This report presents the implementation of both tasks of Assignment 4.
-Task 1 implements a Smart City Road Network Optimizer on an undirected
-weighted graph with two edge weights (construction cost and travel time),
-and Task 2 implements a Logistics Dispatch Centre that combines a live
-max-heap priority queue with an in-place randomised quicksort for shift-end
-record sorting. The report summarises the validation policies, the main
-data structures, the implementation approach, time--space complexity, and
-the test-case outputs for both tasks.
-
-% =====================================================================
 \section{Task 1: Smart City Road Network Optimizer}
-% =====================================================================
 
 \subsection{Objective}
-The objective of this task is to model a city as an undirected weighted
-graph with \(N\) intersections and \(M\) roads, where every road carries a
-construction cost and a travel time. The class \texttt{CityGraph} supports
-graph validation, MST construction using Kruskal's algorithm, shortest
-travel-time path computation using Dijkstra's algorithm, comparison of the
-MST path against the optimal shortest path, and identification of the
-critical roads of the MST.
+The objective of Task 1 is to process a city road graph in which each road stores both \texttt{cost} and \texttt{travelTime}. The implementation first validates the graph through \texttt{validateGraph()}, then constructs the minimum-cost spanning road network using \texttt{buildMST()}, finds the minimum-travel-time route using \texttt{shortestPath(S, T)}, compares the MST path against the optimal path using \texttt{compareNetworks(S, T)}, and finally identifies MST roads whose removal increases the MST cost using \texttt{criticalRoads()}.
 
 \subsection{Approach}
-The complete graph is managed by the class \texttt{CityGraph}. Each road is
-stored in an \texttt{Edge} struct containing \texttt{u}, \texttt{v},
-\texttt{cost}, and \texttt{travelTime}. The input edge list is kept in
-\texttt{edges} and is never modified after the constructor. The full-graph
-adjacency chain \texttt{adjFull} is built once inside the constructor using
-\texttt{buildFullAdjacency()}, which means that \texttt{shortestPath()} can
-be called on its own without requiring \texttt{buildMST()} to have been
-invoked first. The MST-only adjacency chain \texttt{adjMST} is built later
-inside \texttt{buildMST()} via \texttt{buildMSTAdjacency()}, and a boolean
-flag \texttt{mstBuilt} is set to true at the end of \texttt{buildMST()};
-\texttt{compareNetworks()} and \texttt{criticalRoads()} check this flag
-before running.
+The complete graph is managed by the class \texttt{CityGraph}. Each road is stored in the structure \texttt{Edge}, which contains \texttt{u}, \texttt{v}, \texttt{cost}, and \texttt{travelTime}. The full road list is stored in \texttt{edges}, while the roads accepted into the MST are stored in \texttt{mstEdges}. The adjacency structures \texttt{adjFull} and \texttt{adjMST} are used to represent the full graph and the MST graph using travel-time weights.
 
-The MST is constructed by Kruskal's algorithm inside \texttt{buildMST()}.
-The edge indices are sorted in ascending order of \texttt{cost} using
-\texttt{sortEdgeIndicesByCost()}, which is a plain selection sort on
-indices so the original input order is preserved. A Disjoint Set Union
-(DSU) with path compression and union by size is maintained in the arrays
-\texttt{parent} and \texttt{setSize} through the helpers \texttt{initDSU()},
-\texttt{findParent()}, and \texttt{unionSets()}. Each edge is either
-accepted (when its endpoints lie in different DSU components) or rejected
-(when they already lie in the same component and the edge would form a
-cycle), and the running MST cost is printed after every acceptance. The
-same DSU is reused inside \texttt{criticalRoads()}, which reruns Kruskal's
-pass once per MST edge while skipping that edge to check whether the MST
-cost increases or the graph becomes disconnected.
-
-Shortest paths are computed by the helper \texttt{dijkstra()} in the simple
-\(O(N^{2})\) form: at every step the unvisited node with the smallest
-tentative distance is picked by a linear scan of the \texttt{dist} array,
-its outgoing edges are relaxed, and the predecessor is recorded in the
-\texttt{prev} array. The actual path from \(S\) to \(T\) is then rebuilt by
-\texttt{reconstructPath()}. The helper \texttt{getPathTravelTime()} is a
-thin wrapper that returns just the integer travel time, and it is used
-twice inside \texttt{compareNetworks()} --- once on \texttt{adjFull} and
-once on \texttt{adjMST}. Connectivity during input validation is checked by
-\texttt{countReachableFromZero()}, which runs a BFS from node 0 using a
-\texttt{vector<int>} with a front index in place of a queue.
+The function \texttt{validateGraph()} first checks whether the graph satisfies the chosen validation policy. After successful validation, \texttt{buildMST()} applies Kruskal's algorithm. The helper \texttt{sortEdgeIndicesByCost()} arranges edge indices by increasing \texttt{cost}, and the DSU helpers \texttt{initDSU()}, \texttt{findParent()}, and \texttt{unionSets()} are used to decide whether a road should be accepted or rejected. For shortest travel-time queries, \texttt{dijkstra()} is used on \texttt{adjFull}, and the final route is rebuilt by \texttt{reconstructPath()}. The function \texttt{compareNetworks(S, T)} evaluates the travel time on both \texttt{adjFull} and \texttt{adjMST}, while \texttt{criticalRoads()} removes one road from \texttt{mstEdges} at a time and rebuilds the MST cost to measure the impact.
 
 \subsection{Graph Validation Policy}
 The validation policy enforced by \texttt{validateGraph()} is:
 \begin{itemize}
-    \item Self-loops are forbidden: an edge with \(u = v\) is rejected.
-    \item Every node id used by an edge must lie in \([0, N - 1]\).
-    \item Construction cost and travel time must both be non-negative.
-    \item Duplicate roads between the same unordered pair of intersections are forbidden.
-    \item The graph must be connected: a BFS from node 0 through \texttt{countReachableFromZero()} must reach every node.
+    \item self-loops are not allowed,
+    \item duplicate roads between the same unordered pair are not allowed,
+    \item both \texttt{cost} and \texttt{travelTime} must be non-negative,
+    \item every node id must lie in the range \([0, N-1]\),
+    \item the graph must be connected, checked through \texttt{countReachableFromZero()}.
 \end{itemize}
-The rules are checked in the order listed above, and the first rule that
-fails rejects the input with a specific reason. Invalid source and
-destination node ids inside \texttt{shortestPath()} and
-\texttt{compareNetworks()} are caught at the start of the call at runtime.
+If any rule fails, the function reports the first specific reason. Invalid values of \texttt{S} and \texttt{T} are handled inside \texttt{shortestPath(S, T)} and \texttt{compareNetworks(S, T)}.
+
+\subsection{Data Structures Used}
+\begin{table}[H]
+\centering
+\scriptsize
+\begin{tabularx}{\textwidth}{|p{3.0cm}|p{3.2cm}|X|}
+\hline
+\textbf{Data Structure / Variable} & \textbf{Main Fields / Form} & \textbf{Use in the Implementation} \\
+\hline
+\texttt{Edge} & \texttt{u}, \texttt{v}, \texttt{cost}, \texttt{travelTime} & Stores one road of the city graph together with the construction cost and travel-time weight. \\
+\hline
+\texttt{edges} & \texttt{vector<Edge>} & Stores the original input graph on which validation, MST construction, and full-graph shortest path are performed. \\
+\hline
+\texttt{mstEdges} & \texttt{vector<Edge>} & Stores only those roads that are accepted into the MST during \texttt{buildMST()}. \\
+\hline
+\texttt{adjFull}, \texttt{adjMST} & \texttt{vector<vector<pair<int,int>>>} & Store the full graph and MST graph in adjacency-list form weighted by \texttt{travelTime}. \\
+\hline
+\texttt{parent}, \texttt{setSize} & \texttt{vector<int>} & DSU arrays used inside Kruskal's algorithm to track connected components and perform union by size. \\
+\hline
+\texttt{dist}, \texttt{prev}, \texttt{visited} & helper vectors in \texttt{dijkstra()} & Used to store shortest distance values, predecessor links, and finalised nodes during shortest-path computation. \\
+\hline
+\texttt{bfsQueue} & \texttt{vector<int>} & Used as a simple queue inside \texttt{countReachableFromZero()} for the connectivity check. \\
+\hline
+\end{tabularx}
+\end{table}
 
 \subsection{Functions and Implementation}
-\texttt{initDSU(n)}, \texttt{findParent(x)}, and \texttt{unionSets(x, y)}
-implement the DSU with path compression and union by size.
-\texttt{sortEdgeIndicesByCost(indexList)} is a selection sort on the edge
-indices. \texttt{dijkstra(adj, S, dist, prev)} computes single-source
-shortest paths in \(O(N^{2})\). \texttt{reconstructPath(T, prev, dist)}
-rebuilds the \(S \to T\) path from \texttt{prev}.
-\texttt{getPathTravelTime(adj, S, T)} returns just the integer travel time.
-\texttt{buildFullAdjacency()} fills \texttt{adjFull} once in the
-constructor, and \texttt{buildMSTAdjacency()} fills \texttt{adjMST} at the
-end of \texttt{buildMST()}. \texttt{countReachableFromZero()} performs the
-BFS-based connectivity check. The public operations
-\texttt{validateGraph()}, \texttt{buildMST()}, \texttt{shortestPath(S, T)},
-\texttt{compareNetworks(S, T)}, and \texttt{criticalRoads()} orchestrate
-the helpers as described above.
+\begin{table}[H]
+\centering
+\scriptsize
+\begin{tabularx}{\textwidth}{|p{4.35cm}|X|}
+\hline
+\textbf{Function Name} & \textbf{Role in the Code} \\
+\hline
+\texttt{validateGraph()} & Checks the complete graph-validation policy and prints the first exact reason if the graph is invalid. \\
+\hline
+\texttt{buildMST()} & Sorts roads by \texttt{cost}, applies Kruskal's algorithm, prints accept/reject status, updates \texttt{mstCost}, and fills \texttt{mstEdges}. \\
+\hline
+\texttt{shortestPath(S, T)} & Runs \texttt{dijkstra()} on \texttt{adjFull}, rebuilds the route through \texttt{reconstructPath()}, and prints the per-hop \texttt{travelTime} breakdown. \\
+\hline
+\texttt{compareNetworks(S, T)} & Measures the travel time on \texttt{adjFull} and \texttt{adjMST} through \texttt{getPathTravelTime()} and reports how much slower the MST path is. \\
+\hline
+\texttt{criticalRoads()} & Removes one road from \texttt{mstEdges} at a time, rebuilds the MST cost, and reports whether that road is critical. \\
+\hline
+\texttt{initDSU()}, \texttt{findParent()}, \texttt{unionSets()} & Implement the DSU required by Kruskal's algorithm using path compression and union by size. \\
+\hline
+\texttt{sortEdgeIndicesByCost()} & Performs selection sort on the edge-index array so that the original order of \texttt{edges} remains unchanged. \\
+\hline
+\texttt{dijkstra()} & Computes shortest travel times from the source by using the simple \(O(N^2)\) version of Dijkstra's algorithm. \\
+\hline
+\texttt{reconstructPath()} & Uses the \texttt{prev} array to rebuild the final \texttt{S} to \texttt{T} route after Dijkstra's run. \\
+\hline
+\texttt{getPathTravelTime()} & Returns the shortest travel time between two nodes on a given adjacency structure. \\
+\hline
+\texttt{buildAdjacency()} & Builds \texttt{adjFull} and \texttt{adjMST} from \texttt{edges} and \texttt{mstEdges}. \\
+\hline
+\texttt{countReachableFromZero()} & Performs the BFS-based connectivity check required by \texttt{validateGraph()}. \\
+\hline
+\end{tabularx}
+\end{table}
 
 \subsection{Time and Space Complexity Analysis}
-Let \(N\) be the number of intersections, \(M\) the number of roads, and
-\(E = N - 1\) the number of MST edges of a valid input.
+Let \(N\) be the number of intersections and \(M\) be the number of roads.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{|p{4.3cm}|p{3.3cm}|p{2.5cm}|p{5.2cm}|}
+\scriptsize
+\begin{tabularx}{\textwidth}{|p{3.55cm}|p{2.2cm}|p{2.0cm}|X|}
 \hline
 \textbf{Operation} & \textbf{Time Complexity} & \textbf{Space Complexity} & \textbf{Explanation} \\
 \hline
-\texttt{findParent()},
-\texttt{unionSets()}
-& nearly \(O(1)\) amortised & \(O(N)\) &
-Path compression and union by size keep the DSU operations almost constant-time. \\
+\texttt{initDSU()}, \texttt{findParent()}, \texttt{unionSets()} & near \(O(1)\) amortized & \(O(N)\) & DSU uses path compression and union by size. \\
 \hline
-\texttt{sortEdgeIndicesByCost()}
-& \(O(M^{2})\) & \(O(M)\) &
-Selection sort on the \(M\) edge indices. \\
+\texttt{sortEdgeIndicesByCost()} & \(O(M^2)\) & \(O(M)\) & Selection sort is performed on the edge-index array. \\
 \hline
-\texttt{dijkstra()}
-& \(O(N^{2} + M)\) & \(O(N)\) &
-At each iteration the next node is picked by a linear scan of \texttt{dist}. \\
+\texttt{buildAdjacency()} & \(O(M)\) & \(O(N+M)\) & The full graph and MST graph are stored in adjacency-list form. \\
 \hline
-\texttt{reconstructPath()}
-& \(O(N)\) & \(O(N)\) &
-Walks the \texttt{prev} array from \(T\) back to the source. \\
+\texttt{countReachableFromZero()} & \(O(N+M)\) & \(O(N+M)\) & One BFS over a temporary adjacency list. \\
 \hline
-\texttt{countReachableFromZero()}
-& \(O(N + M)\) & \(O(N + M)\) &
-Single BFS over the unweighted version of the graph. \\
+\texttt{validateGraph()} & \(O(M^2)\) & \(O(N+M)\) & Nested duplicate-road checking dominates the validation pass. \\
 \hline
-\texttt{validateGraph()}
-& \(O(M^{2} + N + M)\) & \(O(N + M)\) &
-The duplicate-edge double loop is the dominant \(O(M^{2})\) term. \\
+\texttt{dijkstra()} & \(O(N^2+M)\) & \(O(N)\) & The next node is chosen by scanning \texttt{dist} linearly. \\
 \hline
-\texttt{buildMST()}
-& \(O(M^{2})\) & \(O(N + M)\) &
-Dominated by the selection sort on edge indices. \\
+\texttt{buildMST()} & \(O(M^2 + M\,\alpha(N))\) & \(O(N+M)\) & Kruskal's algorithm is used, but selection sort dominates. \\
 \hline
-\texttt{shortestPath(S, T)}
-& \(O(N^{2} + M)\) & \(O(N)\) &
-One \texttt{dijkstra()} call followed by path reconstruction. \\
+\texttt{shortestPath(S, T)} & \(O(N^2+M)\) & \(O(N)\) & One Dijkstra pass plus path reconstruction. \\
 \hline
-\texttt{compareNetworks(S, T)}
-& \(O(N^{2} + M)\) & \(O(N)\) &
-Two \texttt{dijkstra()} calls, one on \texttt{adjFull} and one on \texttt{adjMST}. \\
+\texttt{compareNetworks(S, T)} & \(O(N^2+M)\) & \(O(N)\) & Shortest-time queries are performed on \texttt{adjFull} and \texttt{adjMST}. \\
 \hline
-\texttt{criticalRoads()}
-& \(O(E \cdot M^{2})\) & \(O(N + M)\) &
-Kruskal's pass is rerun once per MST edge. \\
+\texttt{criticalRoads()} & \(O(M^2 + NM\,\alpha(N))\) & \(O(N+M)\) & The sorted index list is reused, then the MST is rebuilt once per edge of \texttt{mstEdges}. \\
 \hline
-\end{tabular}
-\caption{Task 1 time and space complexity.}
+\end{tabularx}
 \end{table}
 
-Total storage used by the class is \(O(N + M)\) because of \texttt{edges},
-\texttt{mstEdges}, \texttt{adjFull}, and \texttt{adjMST}.
-
 \subsection{Test Case Demonstrations}
-
 \begin{figure}[H]
 \centering
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task1_tc1.png}
-    \caption{Task 1 -- Test Case 1 Output}
-\end{subfigure}
+\placeholderbox{Paste Task 1 - Test Case 1 output screenshot here.}{(a) Task 1 - Test Case 1 Output}
 \hfill
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task1_tc2.png}
-    \caption{Task 1 -- Test Case 2 Output}
-\end{subfigure}
-
-\vspace{0.6em}
-
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task1_tc3.png}
-    \caption{Task 1 -- Test Case 3 Output}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task1_tc4.png}
-    \caption{Task 1 -- Test Case 4 Output}
-\end{subfigure}
-\caption{Task 1 test cases}
+\placeholderbox{Paste Task 1 - Test Case 2 output screenshot here.}{(b) Task 1 - Test Case 2 Output}
+\caption{Task 1 selected test cases}
 \end{figure}
 
-% =====================================================================
 \section{Task 2: Logistics Dispatch Centre}
-% =====================================================================
 
 \subsection{Objective}
-The objective of this task is to implement a regional disaster-relief
-dispatch centre that stores \(N\) aid requests, each with a unique
-\texttt{requestID}, an integer \texttt{priority} in \([0, 100]\), and a
-submission \texttt{timestamp}. The class \texttt{DispatchCentre} supports
-input validation, live heap-based dispatch, in-place priority updates, a
-top-\(k\) peek that does not modify the live structure, and shift-end
-in-place sorting of records by either \texttt{priority} or
-\texttt{timestamp}.
+The objective of Task 2 is to manage a live dispatch queue in which the next processed request must always have the highest \texttt{priority}, while still supporting update operations and shift-end sorting. The implementation validates the request list using \texttt{validateInput(requests)}, builds the live structure using \texttt{buildStructure(requests)}, removes the highest-priority request using \texttt{dispatchNext()}, changes an existing request by \texttt{updatePriority(request\_id, new\_priority)}, sorts records using \texttt{sortRecords(records, key)}, and returns the highest-priority requests through \texttt{topKRequests(k)} without changing the live heap.
 
 \subsection{Approach}
-The complete dispatch centre is managed by the class
-\texttt{DispatchCentre}. Each request is stored in a \texttt{Request}
-struct containing \texttt{requestID}, \texttt{priority}, and
-\texttt{timestamp}. The max-heap itself is kept inside a single data member
-\texttt{heap} of type \texttt{vector<Request>}, treated as a one-dimensional
-array with the standard indexing \(\text{parent} = (i - 1) / 2\),
-\(\text{leftChild} = 2i + 1\), \(\text{rightChild} = 2i + 2\). The internal
-helpers \texttt{swapNodes()}, \texttt{siftUp()}, and \texttt{siftDown()}
-restore the max-heap invariant after any single change.
+The complete implementation is managed by the class \texttt{DispatchCentre}. Each request is stored in the structure \texttt{Request}, which contains \texttt{requestID}, \texttt{priority}, and \texttt{timestamp}. The live queue is stored in the vector \texttt{heap}, treated as an array-based max-heap. The helper \texttt{buildStructure(requests)} copies the input requests into \texttt{heap} and restores the heap property through bottom-up \texttt{siftDown()} calls.
 
-The heap is built inside \texttt{buildStructure()} using bottom-up heapify
-(Floyd's algorithm): starting from the last non-leaf node at index
-\(n / 2 - 1\) and walking backwards to the root, each subtree is heapified
-by a sift-down. This gives overall \(O(n)\) construction instead of the
-\(O(n \log n)\) of repeated insertion. \texttt{dispatchNext()} removes the
-root, replaces it with the last element, shrinks the heap by one, and sifts
-the new root down. \texttt{updatePriority()} locates the target request
-with \texttt{findIndexByID()}, which is a linear scan over the heap array,
-then overwrites the priority and sifts the node either up or down depending
-on whether the new priority is greater or smaller than the old one.
-
-Shift-end sorting is handled by \texttt{sortRecords()}, which calls the
-recursive helper \texttt{quicksortHelper()}. This is a randomised Lomuto
-quicksort: at each recursive call a pivot index is chosen uniformly at
-random in \([\text{lo}, \text{hi}]\), the pivot is moved to the right end,
-and the array is partitioned by pushing elements greater than or equal to
-the pivot to the left. The sort is entirely in-place --- the only extra
-memory is the recursion stack, \(O(\log n)\) on average. The comparison
-returns ``greater or equal'' rather than ``less or equal'', so the final
-order is \emph{descending} on the chosen key. This behaviour is stated
-explicitly in the banner printed by \texttt{sortRecords()}. The
-\texttt{sortRecords()} function supports both \texttt{"priority"} and
-\texttt{"timestamp"} via the helper \texttt{getKey()}.
-
-The top-\(k\) peek \texttt{topKRequests(k)} is implemented on a local copy
-\texttt{tempHeap} so the live \texttt{heap} is never touched. The function
-performs \(k\) extract-max operations on \texttt{tempHeap}, prints each
-extracted request, and \emph{returns} the collected list as a
-\texttt{vector<Request>} in decreasing order of priority.
+Once the structure is built, \texttt{dispatchNext()} removes the root request and restores the heap property by moving the replacement downward. The function \texttt{updatePriority(request\_id, new\_priority)} first finds the request using \texttt{findIndexByID(request\_id)} and then calls either \texttt{siftUp()} or \texttt{siftDown()} depending on whether the priority increased or decreased. For shift-end record handling, \texttt{sortRecords(records, key)} calls \texttt{quicksortHelper(arr, lo, hi, key, partitionCount)} to sort the given vector in-place. The function \texttt{topKRequests(k)} does not modify \texttt{heap}; instead, it copies the heap into \texttt{tempHeap} and extracts the maximum \(k\) times from the copy.
 
 \subsection{Data Handling Policy}
-The data handling policy enforced by \texttt{validateInput()} and
-\texttt{updatePriority()} is:
+The policy enforced by \texttt{validateInput(requests)} and \texttt{updatePriority(request\_id, new\_priority)} is:
 \begin{itemize}
-    \item Every \texttt{requestID} inside one input batch must be unique.
-    \item \texttt{priority} must be an integer in \([0, 100]\).
-    \item Duplicate request IDs are rejected at input time, with the offending ID reported.
-    \item Out-of-range priorities are rejected at input time, with the offending value reported.
-    \item Inside \texttt{updatePriority()}, an unknown \texttt{requestID} and an out-of-range new priority are both rejected with a clear error, and the heap is left unchanged in either case.
+    \item every \texttt{requestID} must be unique inside one input batch,
+    \item every \texttt{priority} must lie in the range \([0, 100]\),
+    \item an \texttt{updatePriority()} call is invalid if the id is unknown,
+    \item an \texttt{updatePriority()} call is invalid if the new priority is outside \([0, 100]\).
 \end{itemize}
+The code prints the exact invalid reason and leaves the live structure unchanged when an invalid update is attempted.
+
+\subsection{Data Structures Used}
+\begin{table}[H]
+\centering
+\scriptsize
+\begin{tabularx}{\textwidth}{|p{3.0cm}|p{3.2cm}|X|}
+\hline
+\textbf{Data Structure / Variable} & \textbf{Main Fields / Form} & \textbf{Use in the Implementation} \\
+\hline
+\texttt{Request} & \texttt{requestID}, \texttt{priority}, \texttt{timestamp} & Stores one aid request together with the two keys used for live dispatch and shift-end sorting. \\
+\hline
+\texttt{heap} & \texttt{vector<Request>} & Stores the live dispatch structure as an array-based max-heap ordered by \texttt{priority}. \\
+\hline
+\texttt{tempHeap} & local \texttt{vector<Request>} & Stores a copy of \texttt{heap} inside \texttt{topKRequests(k)} so that the live structure is not modified. \\
+\hline
+\texttt{parent}, \texttt{leftChild}, \texttt{rightChild} & integer indices & Used inside heap operations to move upward or downward while restoring the heap property. \\
+\hline
+\texttt{lo}, \texttt{hi}, \texttt{pivIdx}, \texttt{partitionCount} & quicksort helper variables & Used to select the pivot, define the current subarray, and print recursive partition information. \\
+\hline
+\end{tabularx}
+\end{table}
 
 \subsection{Functions and Implementation}
-\texttt{swapNodes(i, j)}, \texttt{siftUp(i)}, and \texttt{siftDown(i, n)}
-restore the max-heap invariant after any single change.
-\texttt{findIndexByID(reqID)} is a linear scan that returns the heap index
-of a request given its ID, or \(-1\) if the ID is absent.
-\texttt{getKey(r, key)} returns either \texttt{r.priority} or
-\texttt{r.timestamp} depending on the \texttt{key} string and is used by
-the partition step. \texttt{quicksortHelper(arr, lo, hi, key, partitionCount)}
-implements the recursive randomised Lomuto quicksort.
-\texttt{printHeap()} prints the live heap as an array after every
-modification.
-
-The public operations are \texttt{validateInput(requests)},
-\texttt{buildStructure(requests)}, \texttt{dispatchNext()},
-\texttt{updatePriority(reqID, newPriority)}, \texttt{sortRecords(records, key)},
-and \texttt{topKRequests(k)}. The last one returns a
-\texttt{vector<Request>} containing the top \(k\) requests in decreasing
-order of priority; the same list is also printed.
+\begin{table}[H]
+\centering
+\scriptsize
+\begin{tabularx}{\textwidth}{|p{4.35cm}|X|}
+\hline
+\textbf{Function Name} & \textbf{Role in the Code} \\
+\hline
+\texttt{validateInput(requests)} & Checks duplicate \texttt{requestID} values and out-of-range \texttt{priority} values before the live structure is built. \\
+\hline
+\texttt{buildStructure(requests)} & Copies the given requests into \texttt{heap} and restores the max-heap property through bottom-up heapify. \\
+\hline
+\texttt{dispatchNext()} & Removes the maximum-priority request from the root, restores the heap by \texttt{siftDown()}, and prints the updated state. \\
+\hline
+\texttt{updatePriority(request\_id, new\_priority)} & Finds the target request by \texttt{findIndexByID()}, updates its \texttt{priority}, and restores the heap by either \texttt{siftUp()} or \texttt{siftDown()}. \\
+\hline
+\texttt{sortRecords(records, key)} & Sorts the given vector in-place on the selected key by calling \texttt{quicksortHelper()}. \\
+\hline
+\texttt{topKRequests(k)} & Returns the \(k\) highest-priority requests in decreasing order by repeatedly extracting from \texttt{tempHeap}. \\
+\hline
+\texttt{swapNodes()} & Swaps two heap elements during heap maintenance and quicksort partitioning. \\
+\hline
+\texttt{siftUp()}, \texttt{siftDown()} & Restore the max-heap property after insertion-style or deletion-style priority changes. \\
+\hline
+\texttt{findIndexByID()} & Performs a linear scan on \texttt{heap} to locate the request whose \texttt{requestID} matches the given id. \\
+\hline
+\texttt{quicksortHelper(arr, lo, hi, key, partitionCount)} & Performs recursive randomized quicksort and prints the pivot and partition boundaries for tracing. \\
+\hline
+\end{tabularx}
+\end{table}
 
 \subsection{Time and Space Complexity Analysis}
-Let \(n\) be the number of requests currently stored inside the heap, and
-\(k\) the parameter to \texttt{topKRequests()}.
+Let \(n\) be the number of requests currently stored in the structure.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{|p{4.3cm}|p{3.3cm}|p{2.5cm}|p{5.2cm}|}
+\scriptsize
+\begin{tabularx}{\textwidth}{|p{3.55cm}|p{2.2cm}|p{2.0cm}|X|}
 \hline
 \textbf{Operation} & \textbf{Time Complexity} & \textbf{Space Complexity} & \textbf{Explanation} \\
 \hline
-\texttt{swapNodes()}
-& \(O(1)\) & \(O(1)\) &
-Swaps two heap entries through a temporary. \\
+\texttt{swapNodes()} & \(O(1)\) & \(O(1)\) & Swaps two requests using one temporary variable. \\
 \hline
-\texttt{siftUp()},
-\texttt{siftDown()}
-& \(O(\log n)\) & \(O(1)\) &
-Each one walks at most one root-to-leaf path. \\
+\texttt{siftUp()}, \texttt{siftDown()} & \(O(\log n)\) & \(O(1)\) & Only one heap path is traversed. \\
 \hline
-\texttt{findIndexByID()}
-& \(O(n)\) & \(O(1)\) &
-Linear scan over the heap array. \\
+\texttt{findIndexByID()} & \(O(n)\) & \(O(1)\) & Request ids are searched through a linear scan on \texttt{heap}. \\
 \hline
-\texttt{validateInput()}
-& \(O(n^{2})\) & \(O(1)\) &
-The duplicate-ID double loop is the dominant cost. \\
+\texttt{validateInput()} & \(O(n^2)\) & \(O(1)\) & Duplicate ids are checked by comparing each request with all earlier requests. \\
 \hline
-\texttt{buildStructure()}
-& \(O(n)\) & \(O(n)\) &
-Bottom-up heapify (Floyd's algorithm); the \(O(n)\) space holds the heap itself. \\
+\texttt{buildStructure()} & \(O(n)\) & \(O(n)\) & Bottom-up heapify is used after copying the requests into \texttt{heap}. \\
 \hline
-\texttt{dispatchNext()}
-& \(O(\log n)\) & \(O(1)\) &
-Replace the root with the last element and sift down. \\
+\texttt{dispatchNext()} & \(O(\log n)\) & \(O(1)\) & Root removal followed by one \texttt{siftDown()} call. \\
 \hline
-\texttt{updatePriority()}
-& \(O(n)\) & \(O(1)\) &
-Dominated by the linear ID scan; the sift itself is \(O(\log n)\). \\
+\texttt{updatePriority()} & \(O(n)\) & \(O(1)\) & The linear scan in \texttt{findIndexByID()} dominates the update. \\
 \hline
-\texttt{sortRecords()}
-& \(O(n \log n)\) average,
-  \(O(n^{2})\) worst
-& \(O(\log n)\) auxiliary &
-Randomised Lomuto quicksort, fully in-place; the only extra memory is the recursion stack. \\
+\texttt{sortRecords()} / \texttt{quicksortHelper()} & average \(O(n\log n)\), worst \(O(n^2)\) & average \(O(\log n)\) & Randomized in-place quicksort uses only recursion stack space on average. \\
 \hline
-\texttt{topKRequests(k)}
-& \(O(n + k \log n)\) & \(O(n)\) &
-The live heap is copied into \texttt{tempHeap} so that the \(k\) extract-max operations do not modify it. \\
+\texttt{topKRequests(k)} & \(O(n + k\log n)\) & \(O(n)\) & A copy of \texttt{heap} is made in \texttt{tempHeap}, then extract-max is applied \(k\) times. \\
 \hline
-\end{tabular}
-\caption{Task 2 time and space complexity.}
+\end{tabularx}
 \end{table}
 
-The auxiliary space of \texttt{sortRecords()} is only the recursion stack,
-and no auxiliary array of size \(n\) is allocated --- this satisfies the
-problem statement's in-place requirement.
-
 \subsection{Test Case Demonstrations}
-
 \begin{figure}[H]
 \centering
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task2_tc1.png}
-    \caption{Task 2 -- Test Case 1 Output}
-\end{subfigure}
+\placeholderbox{Paste Task 2 - Test Case 1 output screenshot here.}{(a) Task 2 - Test Case 1 Output}
 \hfill
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task2_tc2.png}
-    \caption{Task 2 -- Test Case 2 Output}
-\end{subfigure}
-
-\vspace{0.6em}
-
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task2_tc3.png}
-    \caption{Task 2 -- Test Case 3 Output}
-\end{subfigure}
-\hfill
-\begin{subfigure}[b]{0.48\textwidth}
-    \includegraphics[width=\textwidth,keepaspectratio]{task2_tc4.png}
-    \caption{Task 2 -- Test Case 4 Output}
-\end{subfigure}
-\caption{Task 2 test cases}
+\placeholderbox{Paste Task 2 - Test Case 2 output screenshot here.}{(b) Task 2 - Test Case 2 Output}
+\caption{Task 2 selected test cases}
 \end{figure}
 
-\vspace{1em}
-
-\noindent The test cases used in \texttt{main()} are hardcoded so that the
-program output is deterministic; the screenshots above are produced by
-compiling and running \texttt{TASK1.cpp} and \texttt{TASK2.cpp} directly.
-
-% =====================================================================
 \section{GitHub Repository}
-% =====================================================================
-
-The complete source code and the test-case screenshots for both tasks are
-available in the following repository:
+The complete source code and associated test cases for both Task 1 and Task 2 are available in the following repository:
 \begin{itemize}
     \item \url{https://github.com/dakshrathi-india/DSA-ASSIGNMENT-4}
 \end{itemize}

@@ -658,40 +658,5 @@ int main(){
         g2.criticalRoads();
     }
 
-
-    //TEST CASE 3 - demonstrates that shortestPath works without calling buildMST first
-    cout<<"\n\nTEST CASE 3 (shortestPath called BEFORE buildMST)\n";
-
-    int N3 = 5;
-    vector<Edge> edges3 = {
-        {0, 1, 2, 3}, {0, 2, 5, 1}, {1, 2, 1, 2},
-        {1, 3, 4, 5}, {2, 4, 3, 2}, {3, 4, 2, 4}
-    };
-
-    CityGraph g3(N3, edges3);
-
-    if(g3.validateGraph()){
-        //call shortestPath FIRST , before buildMST
-        g3.shortestPath(0, 4);
-
-        //now build the MST and call the rest
-        g3.buildMST();
-        g3.compareNetworks(0, 4);
-        g3.criticalRoads();
-    }
-
-
-    //TEST CASE 4 - invalid graph , rejected by rule (1) self-loop
-    cout<<"\n\nTEST CASE 4 (invalid graph)\n";
-
-    int N4 = 3;
-    vector<Edge> edges4 = {
-        {0, 0, 5, 2},     //self-loop
-        {0, 1, 3, 1}
-    };
-
-    CityGraph g4(N4, edges4);
-    g4.validateGraph();
-
     return 0;
 }
