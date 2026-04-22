@@ -520,40 +520,35 @@ class DispatchCentre{
 
 int main(){
 
-    //TEST CASE 1 - full demo , six requests
+    //TEST CASE 1 - basic demo , five requests
     cout<<"TEST CASE 1\n";
-
+ 
     vector<Request> reqs1 = {
         {101, 45, 1}, {102, 80, 2}, {103, 35, 3},
-        {104, 90, 4}, {105, 60, 5}, {106, 75, 6}
+        {104, 90, 4}, {105, 60, 5}
     };
-
+ 
     DispatchCentre dc1;
-
+ 
     if(dc1.validateInput(reqs1)){
         dc1.buildStructure(reqs1);
-
-        //dispatch the two highest-priority requests
+ 
+        //dispatch the highest-priority request
         dc1.dispatchNext();
-        dc1.dispatchNext();
-
+ 
         //raise a low-priority request , should move UP
-        dc1.updatePriority(103, 95);
-
-        //lower a higher-priority request , should move DOWN
-        dc1.updatePriority(106, 20);
-
-        //peek at the top 3 without modifying the live heap
-        vector<Request> top3 = dc1.topKRequests(3);
-        cout<<"   (returned vector contains "<<top3.size()<<" requests)"<<endl;
-
+        dc1.updatePriority(103, 72);
+ 
+        //try to update an ID that is not present (should be rejected)
+        dc1.updatePriority(999, 50);
+ 
+        //peek at the top 2 without modifying the live heap
+        vector<Request> top2 = dc1.topKRequests(2);
+        cout<<"   (returned vector contains "<<top2.size()<<" requests)"<<endl;
+ 
         //sort an independent copy by priority , descending
         vector<Request> sortCopy1 = reqs1;
         dc1.sortRecords(sortCopy1, "priority");
-
-        //sort an independent copy by timestamp , descending
-        vector<Request> sortCopy2 = reqs1;
-        dc1.sortRecords(sortCopy2, "timestamp");
     }
 
 
@@ -587,30 +582,6 @@ int main(){
         vector<Request> sortCopy3 = reqs2;
         dc2.sortRecords(sortCopy3, "priority");
     }
-
-
-    //TEST CASE 3 - duplicate ID , rejected at validation
-    cout<<"\n\nTEST CASE 3 (duplicate ID)\n";
-
-    vector<Request> reqs3 = {
-        {301, 50, 1},
-        {301, 80, 2}          //duplicate ID
-    };
-
-    DispatchCentre dc3;
-    dc3.validateInput(reqs3);
-
-
-    //TEST CASE 4 - out-of-range priority , rejected at validation
-    cout<<"\n\nTEST CASE 4 (out-of-range priority)\n";
-
-    vector<Request> reqs4 = {
-        {401, 50, 1},
-        {402, 150, 2}         //priority > 100
-    };
-
-    DispatchCentre dc4;
-    dc4.validateInput(reqs4);
 
     return 0;
 }

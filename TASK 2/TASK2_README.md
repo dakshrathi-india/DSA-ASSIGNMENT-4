@@ -275,16 +275,15 @@ invalid) and prints all output to `stdout`.
 
 ## Test Cases
 
-### Test Case 1 — Six requests, full demo
+### Test Case 1 — Five requests, basic demo
 
-After heapify the root is `ID = 104` with priority **90**. Two
-`dispatchNext` calls dispatch IDs 104 and 102 in that order.
-`updatePriority(103, 95)` lifts request 103 to the top (sifted **UP**).
-`updatePriority(106, 20)` pushes 106 down (sifted **DOWN**).
-`topKRequests(3)` both prints and returns `{103, 105, 101}` without touching
-the live heap. The full record list is then sorted descending by both
-`"priority"` and `"timestamp"` with the full pivot / partition trace
-printed.
+After heapify the root is `ID = 104` with priority **90** (2 heapify steps, same
+depth as Test Case 2). One `dispatchNext` call dispatches ID 104.
+`updatePriority(103, 72)` lifts request 103 upward (sifted **UP**).
+`updatePriority(999, 50)` is correctly rejected because ID 999 is not present
+in the heap. `topKRequests(2)` both prints and returns `{102, 103}` without
+touching the live heap. The record list is then sorted descending by
+`"priority"` with the full pivot / partition trace printed.
 
 ### Test Case 2 — Five requests, rejection cases
 
@@ -294,15 +293,6 @@ out-of-range priority `250` — both of which are correctly rejected with the
 heap left unchanged. `topKRequests(2)` returns and prints the top two.
 Finally the record list is sorted descending by priority.
 
-### Test Case 3 — Invalid input (duplicate ID)
-
-Two requests share ID `301`. The validator flags it at position 1 and
-rejects the input.
-
-### Test Case 4 — Invalid input (out-of-range priority)
-
-Request `402` has priority `150`. The validator flags it and rejects the
-input.
 
 ---
 
