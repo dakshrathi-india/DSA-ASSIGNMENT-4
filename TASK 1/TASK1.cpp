@@ -6,15 +6,15 @@ using namespace std;
 
 
 /*
-this struct represents a single road in the city graph
-each road carries:
-1) two endpoint intersections (u, v)
-2) construction cost (used while building the MST)
-3) travel time (used while finding the shortest path)
+this struct represents one road in the city graph
+each road carries two endpoints (u and v), a construction cost and a travel time
+the graph is undirected, so the order of u and v doesn't matter
 
-we treat the graph as undirected, so the order of u and v does not matter
+1) u, v       -> the two intersections the road connects
+2) cost       -> construction cost of the road (used in MST)
+3) travelTime -> time to travel on this road (used in shortest path)
 */
-struct Edge {
+struct Edge{
     int u;
     int v;
     int cost;
@@ -22,43 +22,58 @@ struct Edge {
 };
 
 
+
 /*
 this CLASS contains the code for:
-1) validating the input graph against the validation policy
+1) validating the input graph against the graph validation policy
 2) building the MST using Kruskal's algorithm
 3) finding the shortest travel-time path using Dijkstra's algorithm
-4) comparing the MST path travel time against the shortest path travel time
-5) finding the critical roads of the MST
+4) comparing the MST-path travel time vs the shortest-path travel time
+5) finding the critical roads in the MST
 
-private section contains the helper functions:
-1) DSU helpers (initDSU, findParent, unionSets) used inside Kruskal's
-2) sortEdgeIndicesByCost - selection sort over edge indices used by Kruskal's
-3) dijkstra - the actual single source shortest path routine, takes any adjacency chain
-4) reconstructPath - walks the prev[] array to rebuild the actual S -> T path
-5) getPathTravelTime - returns the travel time of the shortest S -> T path on a given adjacency chain
-6) buildAdjacency - builds the two adjacency chains for the full graph and for the MST
-7) countReachableFromZero - BFS based connectivity check used during validation
+data members:
+1) N              -> number of intersections
+2) edges          -> list of all input roads (never modified after constructor)
+3) mstEdges       -> roads accepted into the MST (filled by buildMST)
+4) mstCost        -> total construction cost of the MST
+5) adjFull        -> adjacency list of the full graph (weighted by travelTime)
+6) adjMST         -> adjacency list of the MST only (weighted by travelTime)
+7) mstBuilt       -> flag set to true once buildMST has been called successfully
 
-public section contains the 5 required operations exactly as named in the task statement
+helper functions (private):
+1) initDSU, findParent, unionSets   -> DSU helpers used inside Kruskal's
+2) sortEdgeIndicesByCost            -> selection sort on edge indices
+3) dijkstra                         -> O(N^2) Dijkstra working on any adj list
+4) reconstructPath                  -> rebuild S->T path using prev[] from dijkstra
+5) getPathTravelTime                -> wrapper that returns the shortest time only
+6) buildFullAdjacency               -> fills adjFull from edges (called in constructor)
+7) buildMSTAdjacency                -> fills adjMST from mstEdges (called after MST build)
+8) countReachableFromZero           -> BFS-based connectivity check used in validation
+
+important design choice:
+    adjFull is built in the CONSTRUCTOR itself, not inside buildMST
+    this way shortestPath / compareNetworks do not need buildMST to have been called first
+    (shortest path on the full graph is mathematically independent of MST construction,
+    so the code structure reflects that)
 */
 class CityGraph{
     private:
-        int N;                          //number of intersections
-        vector<Edge> edges;             //list of all roads (the original input)
-        vector<Edge> mstEdges;          //roads that were accepted into the MST
-        int mstCost;                    //total construction cost of the MST
+        int N;
+        vector<Edge> edges;
+        vector<Edge> mstEdges;
+        int mstCost;
 
-        //adjacency CHAINS, weighted by travel time
-        //each entry of adjFull[v] is a pair {neighbour, travelTime}
         vector<vector<pair<int,int>>> adjFull;
         vector<vector<pair<int,int>>> adjMST;
 
-        //DSU arrays - reused across the buildMST call and the criticalRoads rebuild loop
+        bool mstBuilt;
+
+        //DSU arrays , reused across buildMST call and the rebuild loop inside criticalRoads
         vector<int> parent;
         vector<int> setSize;
 
 
-        //initialize the DSU - every node starts as its own set of size 1
+        //initialize the DSU , every node is its own set of size 1
         void initDSU(int n){
             parent.assign(n, 0);
             setSize.assign(n, 1);
@@ -67,8 +82,7 @@ class CityGraph{
         }
 
 
-        //find the representative (root) of the set that contains x
-        //we use path compression so that the next find on the same node is essentially O(1)
+        //find the root of the set that contains x , uses path compression
         int findParent(int x){
             //base case
             if(parent[x] == x)
@@ -78,18 +92,16 @@ class CityGraph{
         }
 
 
-        //union the sets that contain x and y by attaching the smaller tree under the larger one
-        //this is the union-by-size variant which keeps the trees shallow
+        //union the two sets by attaching the smaller one under the larger one (union by size)
         //returns true if a real union actually happened
         bool unionSets(int x, int y){
             int rootX = findParent(x);
             int rootY = findParent(y);
 
-            //already in the same set
             if(rootX == rootY)
                 return false;
 
-            //attach the smaller tree under the larger one
+            //attach the smaller tree under the larger one to keep the tree shallow
             if(setSize[rootX] < setSize[rootY]){
                 parent[rootX] = rootY;
                 setSize[rootY] += setSize[rootX];
@@ -102,9 +114,8 @@ class CityGraph{
         }
 
 
-        //SELECTION SORT over the indices into edges[]
-        //we sort the indices (not the edges themselves) so the original input order is preserved
-        //ascending order on construction cost
+        //SELECTION SORT on the indices into edges[] , ascending on cost
+        //we sort indices instead of the edges themselves so the original input is not disturbed
         void sortEdgeIndicesByCost(vector<int>& indexList){
             int n = indexList.size();
             for(int i=0; i<n-1; i++){
@@ -123,11 +134,11 @@ class CityGraph{
 
 
         /*
-        DIJKSTRA's algorithm in the simple O(N^2) form
-        - we don't use a heap here; at every step we just scan dist[] for the unvisited node with the smallest distance
-        - dist[]   -> shortest distance from S to every node, INT_MAX if unreachable
-        - prev[]   -> predecessor pointer used later to reconstruct the actual path
-        - visited  -> tracks which nodes are already finalised
+        DIJKSTRA's algorithm , O(N^2) version
+        - we don't use a priority queue , instead at every step we linearly scan dist[] to pick the unvisited node with the smallest distance
+        - dist[]    -> shortest distance from S to every node , INT_MAX if unreachable
+        - prev[]    -> predecessor pointer used later to reconstruct the path
+        - visited[] -> tracks nodes which are already finalised
         */
         void dijkstra(vector<vector<pair<int,int>>>& adj, int S, vector<int>& dist, vector<int>& prev){
             dist.assign(N, INT_MAX);
@@ -136,9 +147,10 @@ class CityGraph{
 
             dist[S] = 0;
 
-            //we will finalise N nodes in the worst case
+            //we will finalise at most N nodes
             for(int count=0; count<N; count++){
-                //pick the unvisited node with the smallest distance
+
+                //pick the unvisited node with the smallest current distance
                 int u = -1;
                 int minDist = INT_MAX;
                 for(int i=0; i<N; i++){
@@ -148,7 +160,7 @@ class CityGraph{
                     }
                 }
 
-                //no more reachable nodes -> we can stop
+                //no more reachable nodes , break out
                 if(u == -1)
                     break;
 
@@ -168,7 +180,7 @@ class CityGraph{
         }
 
 
-        //rebuilds the actual path from S to T using the prev[] array filled by dijkstra
+        //reconstruct the path from S to T using the prev[] filled by dijkstra
         //returns an empty vector if T was unreachable
         vector<int> reconstructPath(int T, vector<int>& prev, vector<int>& dist){
             vector<int> path;
@@ -177,7 +189,7 @@ class CityGraph{
             if(dist[T] == INT_MAX)
                 return path;
 
-            //walk backwards from T using prev[] until we reach the source (prev = -1)
+            //walk backwards from T using prev[] till we hit the source (prev == -1)
             int cur = T;
             while(cur != -1){
                 path.push_back(cur);
@@ -196,8 +208,8 @@ class CityGraph{
         }
 
 
-        //returns the shortest travel time from S to T on the given adjacency chain
-        //returns -1 if no path exists
+        //returns the shortest travel time from S to T on the given adjacency list
+        //returns -1 if T is unreachable from S
         int getPathTravelTime(vector<vector<pair<int,int>>>& adj, int S, int T){
             vector<int> dist, prev;
             dijkstra(adj, S, dist, prev);
@@ -208,18 +220,21 @@ class CityGraph{
         }
 
 
-        //builds the two adjacency chains - one for the full graph, one for the MST
-        //each chain entry is a pair {neighbour, travelTime}
-        void buildAdjacency(){
+        //build adjFull from the stored edges[]
+        //called once from the constructor , adjFull does not change after that
+        void buildFullAdjacency(){
             adjFull.assign(N, vector<pair<int,int>>());
-            adjMST.assign(N, vector<pair<int,int>>());
-
             for(int i=0; i<(int)edges.size(); i++){
                 Edge& e = edges[i];
                 adjFull[e.u].push_back(make_pair(e.v, e.travelTime));
                 adjFull[e.v].push_back(make_pair(e.u, e.travelTime));
             }
+        }
 
+
+        //build adjMST from mstEdges[] , called at the end of buildMST
+        void buildMSTAdjacency(){
+            adjMST.assign(N, vector<pair<int,int>>());
             for(int i=0; i<(int)mstEdges.size(); i++){
                 Edge& e = mstEdges[i];
                 adjMST[e.u].push_back(make_pair(e.v, e.travelTime));
@@ -228,11 +243,11 @@ class CityGraph{
         }
 
 
-        //BFS based connectivity check - used during graph validation
+        //BFS based connectivity check used during graph validation
         //returns the count of nodes reachable from node 0
         //we use a vector<int> with a front index as a simple queue (no <queue> header needed)
         int countReachableFromZero(){
-            //build a temporary unweighted adjacency so we can BFS
+            //build a temporary unweighted adjacency to run BFS on
             vector<vector<int>> tempAdj(N);
             for(int i=0; i<(int)edges.size(); i++){
                 tempAdj[edges[i].u].push_back(edges[i].v);
@@ -267,26 +282,30 @@ class CityGraph{
     public:
 
         //parameterised constructor
-        //we take the edges and N once, store them, and all later operations work on these stored copies
+        //we build adjFull here itself so that shortestPath / compareNetworks can run even if buildMST hasn't been called yet
         CityGraph(int N, vector<Edge>& edges){
             this->N = N;
             this->edges = edges;
             mstCost = 0;
+            mstBuilt = false;
+
+            buildFullAdjacency();
         }
 
 
         /*
-        graph validation policy:
-        1) self-loops are forbidden (an edge with u == v is rejected)
+        GRAPH VALIDATION POLICY:
+        1) self-loops are forbidden (edge with u == v is rejected)
         2) duplicate roads between the same pair of intersections are forbidden
-        3) construction cost and travel time both must be non-negative
+        3) construction cost and travel time must both be non-negative
         4) every node id used by an edge must lie in [0, N-1]
-        5) the graph must be connected (a BFS from node 0 must reach every node)
+        5) the graph must be connected (a BFS from node 0 must reach all N nodes)
 
-        the very first rule that fails causes the whole input to be rejected
-        and a specific reason is printed
-        for runtime queries, invalid source / destination node ids in shortestPath
-        and compareNetworks are caught at the start of the call
+        ordering of checks:  (1) -> (4) -> (3) -> (2) -> (5)
+        the very FIRST rule that fails causes the whole input to be rejected with a specific reason
+
+        invalid source/destination node ids in shortestPath / compareNetworks are caught
+        at the start of those functions (runtime check , see inside the function)
         */
 
         bool validateGraph(){
@@ -299,24 +318,24 @@ class CityGraph{
             cout<<"5) graph must be connected (checked via BFS from node 0)"<<endl;
             cout<<endl;
 
-            //check rules (1), (4), (3) per edge and detect duplicates inside the same loop
+            //check rules (1), (4), (3), (2) per edge
             for(int i=0; i<(int)edges.size(); i++){
                 int u = edges[i].u;
                 int v = edges[i].v;
 
-                //rule (1) - self-loop check
+                //rule (1) - self-loop
                 if(u == v){
                     cout<<"INVALID -> edge "<<i<<" is a self-loop ("<<u<<" - "<<v<<")"<<endl;
                     return false;
                 }
 
-                //rule (4) - node id range check
+                //rule (4) - node id range
                 if(u < 0 || u >= N || v < 0 || v >= N){
                     cout<<"INVALID -> edge "<<i<<" has a node id outside [0, "<<N-1<<"]"<<endl;
                     return false;
                 }
 
-                //rule (3) - non-negative weight check
+                //rule (3) - non-negative weights
                 if(edges[i].cost < 0){
                     cout<<"INVALID -> edge "<<i<<" ("<<u<<"-"<<v<<") has negative construction cost"<<endl;
                     return false;
@@ -326,8 +345,7 @@ class CityGraph{
                     return false;
                 }
 
-                //rule (2) - duplicate check
-                //for each new edge we scan all earlier edges and check if the unordered pair {u, v} matches
+                //rule (2) - duplicate road check (simple O(M) scan over earlier edges)
                 for(int j=0; j<i; j++){
                     int prevU = edges[j].u;
                     int prevV = edges[j].v;
@@ -338,7 +356,7 @@ class CityGraph{
                 }
             }
 
-            //rule (5) - connectivity check using BFS from node 0
+            //rule (5) - connectivity via BFS from node 0
             int reached = countReachableFromZero();
             if(reached < N){
                 cout<<"INVALID -> graph is disconnected ("<<reached<<"/"<<N
@@ -352,21 +370,22 @@ class CityGraph{
 
 
         /*
-        builds the MST using KRUSKAL'S ALGORITHM (a greedy approach):
-        1) sort the edges in non-decreasing order of construction cost
-           (we sort the indices, not the edges themselves)
-        2) initialise a DSU where each node is in its own set
-        3) walk through the sorted edges:
-            - if the two endpoints lie in different sets -> ACCEPT the edge into the MST and union the two sets
-            - else (they are already in the same set)    -> REJECT the edge as it would form a cycle
-        4) the running MST cost is printed after every acceptance
+        builds the MST using KRUSKAL'S ALGORITHM:
+        1) sort the edges in ascending order of construction cost (selection sort on indices)
+        2) initialise the DSU where every node is its own set
+        3) for each edge in sorted order:
+            - if u and v lie in different sets -> ACCEPT the edge , union the sets , add cost
+            - else (same set)                  -> REJECT the edge (it would form a cycle)
+        4) running MST cost is printed after every acceptance
+
+        at the end we also fill adjMST so compareNetworks can query the MST's shortest path
         */
 
         void buildMST(){
             cout<<endl;
             cout<<"BUILDING MST USING KRUSKAL'S ALGORITHM"<<endl;
 
-            //list of indices into edges[] - we sort these so the original input is left untouched
+            //list of indices into edges[] , we sort these instead of the edges themselves
             vector<int> indexList(edges.size());
             for(int i=0; i<(int)indexList.size(); i++)
                 indexList[i] = i;
@@ -380,7 +399,7 @@ class CityGraph{
             for(int k=0; k<(int)indexList.size(); k++){
                 Edge& e = edges[indexList[k]];
 
-                //if u and v are already in the same set, accepting this edge would form a cycle
+                //if u and v are already in the same set , accepting this edge would form a cycle
                 if(findParent(e.u) == findParent(e.v)){
                     cout<<"edge ("<<e.u<<" - "<<e.v<<") cost = "<<e.cost
                         <<" -> REJECTED (would form a cycle)"<<endl;
@@ -394,8 +413,9 @@ class CityGraph{
                 }
             }
 
-            //build the two adjacency chains so that shortestPath / compareNetworks have something to query
-            buildAdjacency();
+            //fill adjMST so compareNetworks can use it
+            buildMSTAdjacency();
+            mstBuilt = true;
 
             cout<<endl;
             cout<<"FINAL MST -> total construction cost = "<<mstCost<<endl;
@@ -408,17 +428,18 @@ class CityGraph{
 
 
         /*
-        finds the SHORTEST TRAVEL TIME PATH from S to T on the FULL graph
-        - first validates that S and T lie inside [0, N-1]
-        - runs the dijkstra helper and reconstructs the actual path using prev[]
-        - prints the path along with the per-hop travel time breakdown and the total
+        SHORTEST PATH from S to T on the FULL graph , weighted by travel time
+        - this operation is independent of buildMST , adjFull is already built in the constructor
+        - first validates that S and T lie inside [0, N-1] (runtime check)
+        - runs dijkstra on adjFull , reconstructs the path using prev[]
+        - prints the path with a per-hop travel time breakdown and the total
         */
 
         void shortestPath(int S, int T){
             cout<<endl;
             cout<<"SHORTEST PATH FROM "<<S<<" TO "<<T<<endl;
 
-            //runtime validation of source / destination
+            //runtime validation of source / destination node ids
             if(S < 0 || S >= N){
                 cout<<"ERROR -> source node "<<S<<" is invalid (must be in [0, "<<N-1<<"])"<<endl;
                 return;
@@ -454,7 +475,7 @@ class CityGraph{
                 int from = path[i];
                 int to = path[i+1];
 
-                //look up the actual edge weight between 'from' and 'to' inside the full adjacency chain
+                //look up the edge weight between 'from' and 'to' inside adjFull
                 int hopTime = 0;
                 for(int j=0; j<(int)adjFull[from].size(); j++){
                     if(adjFull[from][j].first == to){
@@ -472,8 +493,10 @@ class CityGraph{
 
         /*
         compares the travel time of S-to-T on the MST vs on the FULL graph
-        if the MST path is slower, the absolute difference and the percentage difference
-        (relative to the optimal shortest-path travel time) are reported
+        if the MST path is slower, the difference and the percentage (relative to the shortest path) are reported
+
+        note: buildMST must have been called before this , otherwise adjMST is empty
+        we guard against that with the mstBuilt flag
         */
 
         void compareNetworks(int S, int T){
@@ -486,11 +509,16 @@ class CityGraph{
                 return;
             }
 
+            if(!mstBuilt){
+                cout<<"ERROR -> MST has not been built yet , call buildMST() first"<<endl;
+                return;
+            }
+
             int spTime = getPathTravelTime(adjFull, S, T);
             int mstTime = getPathTravelTime(adjMST, S, T);
 
             if(spTime < 0 || mstTime < 0){
-                cout<<"comparison not possible (no path exists in one of the structures)"<<endl;
+                cout<<"comparison not possible (no path exists in one of the two structures)"<<endl;
                 return;
             }
 
@@ -510,22 +538,29 @@ class CityGraph{
 
 
         /*
-        a road is CRITICAL if removing it from the input increases the MST cost
-        (or, in the extreme case, makes the MST impossible to build at all)
+        a road is CRITICAL if removing it from the graph increases the MST cost
+        (or in the extreme case , makes the MST impossible to build at all)
 
-        for every MST edge:
-        1) we rebuild the MST while skipping this one edge during Kruskal's pass
-        2) if fewer than N-1 edges can be added -> the graph would become disconnected -> CRITICAL
-        3) else if the new MST cost is greater than the original mstCost -> CRITICAL with cost impact
-        4) else -> NOT CRITICAL (a same-cost alternative exists)
+        for every edge in mstEdges:
+        1) reinitialise the DSU
+        2) rerun Kruskal's pass while skipping this one edge
+        3) if fewer than N-1 edges get added   -> the graph becomes disconnected -> CRITICAL
+           else if new MST cost > original    -> CRITICAL (with cost impact)
+           else                               -> NOT CRITICAL (a same-cost alternative exists)
         */
 
         void criticalRoads(){
             cout<<endl;
             cout<<"CRITICAL ROADS ANALYSIS"<<endl;
+
+            if(!mstBuilt){
+                cout<<"ERROR -> MST has not been built yet , call buildMST() first"<<endl;
+                return;
+            }
+
             cout<<"removing each MST edge in turn and rebuilding the MST..."<<endl;
 
-            //sort edge indices by cost once and reuse for every rebuild
+            //sort edge indices by cost once , reuse for every rebuild
             vector<int> indexList(edges.size());
             for(int i=0; i<(int)indexList.size(); i++)
                 indexList[i] = i;
@@ -543,7 +578,7 @@ class CityGraph{
                 for(int i=0; i<(int)indexList.size(); i++){
                     Edge& e = edges[indexList[i]];
 
-                    //skip the removed edge - we match by endpoints in either direction
+                    //skip the removed edge , match by endpoints in either direction
                     if((e.u == removedEdge.u && e.v == removedEdge.v) ||
                        (e.u == removedEdge.v && e.v == removedEdge.u))
                         continue;
@@ -580,12 +615,11 @@ class CityGraph{
 };
 
 
+
 int main(){
 
     //TEST CASE 1
-    cout<<"=========================================="<<endl;
-    cout<<"               TEST CASE 1                "<<endl;
-    cout<<"==========================================";
+    cout<<"TEST CASE 1\n";
 
     int N1 = 6;
     vector<Edge> edges1 = {
@@ -605,10 +639,7 @@ int main(){
 
 
     //TEST CASE 2
-    cout<<endl<<endl;
-    cout<<"=========================================="<<endl;
-    cout<<"               TEST CASE 2                "<<endl;
-    cout<<"==========================================";
+    cout<<"\n\nTEST CASE 2\n";
 
     int N2 = 4;
     vector<Edge> edges2 = {
@@ -620,26 +651,47 @@ int main(){
 
     if(g2.validateGraph()){
         g2.buildMST();
+
+        //shortestPath called BEFORE any of the following operations , this works fine because adjFull was built in the constructor
         g2.shortestPath(0, 3);
         g2.compareNetworks(0, 3);
         g2.criticalRoads();
     }
 
 
-    //TEST CASE 3 (invalid graph - self-loop, will be rejected by rule 1)
-    cout<<endl<<endl;
-    cout<<"=========================================="<<endl;
-    cout<<"   TEST CASE 3 (invalid graph)            "<<endl;
-    cout<<"==========================================";
+    //TEST CASE 3 - demonstrates that shortestPath works without calling buildMST first
+    cout<<"\n\nTEST CASE 3 (shortestPath called BEFORE buildMST)\n";
 
-    int N3 = 3;
+    int N3 = 5;
     vector<Edge> edges3 = {
-        {0, 0, 5, 2},   //self-loop
-        {0, 1, 3, 1}
+        {0, 1, 2, 3}, {0, 2, 5, 1}, {1, 2, 1, 2},
+        {1, 3, 4, 5}, {2, 4, 3, 2}, {3, 4, 2, 4}
     };
 
     CityGraph g3(N3, edges3);
-    g3.validateGraph();
+
+    if(g3.validateGraph()){
+        //call shortestPath FIRST , before buildMST
+        g3.shortestPath(0, 4);
+
+        //now build the MST and call the rest
+        g3.buildMST();
+        g3.compareNetworks(0, 4);
+        g3.criticalRoads();
+    }
+
+
+    //TEST CASE 4 - invalid graph , rejected by rule (1) self-loop
+    cout<<"\n\nTEST CASE 4 (invalid graph)\n";
+
+    int N4 = 3;
+    vector<Edge> edges4 = {
+        {0, 0, 5, 2},     //self-loop
+        {0, 1, 3, 1}
+    };
+
+    CityGraph g4(N4, edges4);
+    g4.validateGraph();
 
     return 0;
 }
