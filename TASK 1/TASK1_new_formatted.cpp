@@ -1,12 +1,16 @@
 #include <iostream>
 #include <vector>
 #include <climits>
+
 using namespace std;
 
-/*struct represents one road in the city graph
-1)u, v -> two intersections the road connects
-2)cost -> construction cost (for MST)
-3)travelTime -> time to travel this road (for shortest path)
+
+/*
+this struct represents one road in the city graph
+1) u, v        -> the two intersections the road connects
+2) cost        -> construction cost (used for MST)
+3) travelTime  -> time to travel on this road (used for shortest path)
+
 the graph is undirected so the order of u and v doesn't matter
 */
 struct Edge{
@@ -16,7 +20,10 @@ struct Edge{
     int travelTime;
 };
 
-/*class implements a min-heap for dijkstra's algorithm
+
+
+/*
+this class implements a min-heap for dijkstra's algorithm
 stores (dist , node) pairs , the pair with the smallest dist is always at the top
 */
 class MinHeap{
@@ -29,7 +36,7 @@ class MinHeap{
             data[j] = temp;
         }
 
-        //SIFTING A Pair UP WHILE IT IS SMALLER THAN ITS PARENT
+        //FOR SIFTING A Pair UP WHILE IT IS SMALLER THAN ITS PARENT
         void siftUp(int i){
             while(i > 0){
                 int par = (i-1)/2;
@@ -42,7 +49,7 @@ class MinHeap{
             }
         }
 
-        //SIFTING A PAIR DOWN WHILE IT IS LARGER THAN ONE OF ITS CHILDREN
+        //FOR SIFTING A PAIR DOWN WHILE IT IS LARGER THAN ONE OF ITS CHILDREN
         void siftDown(int i){
             int n = data.size();
             while(true){
@@ -65,17 +72,20 @@ class MinHeap{
         }
 
     public:
+
         MinHeap(){}
 
         bool isEmpty(){
             return data.empty();
         }
 
+        //push a (dist , node) pair into the heap
         void push(int dist, int node){
             data.push_back(make_pair(dist, node));
             siftUp(data.size() - 1);
         }
 
+        //extract and return the pair with the smallest dist
         pair<int,int> extractMin(){
             pair<int,int> top = data[0];
             int n = data.size();
@@ -91,18 +101,33 @@ class MinHeap{
         }
 };
 
+
+
+/*
+this CLASS contains the code for:
+1) validating the input graph
+2) building the MST using kruskal's algorithm
+3) finding the shortest path using dijkstra's algorithm
+4) comparing the MST path travel time vs the shortest path travel time
+5) finding the critical roads in the MST
+*/
 class CityGraph{
     private:
         int N;
         vector<Edge> edges;
         vector<Edge> mstEdges;
         int mstCost;
+
         vector<vector<pair<int,int>>> adjFull;
         vector<vector<pair<int,int>>> adjMST;
+
         bool mstBuilt;
+
         vector<int> parent;
         vector<int> setSize;
 
+
+        //FOR INITIALISING THE DSU
         void initDSU(int n){
             parent.assign(n, 0);
             setSize.assign(n, 1);
@@ -110,7 +135,8 @@ class CityGraph{
                 parent[i] = i;
         }
 
-        //FINDING THE ROOT OF THE SET THAT CONTAINS x
+
+        //FOR FINDING THE ROOT OF THE SET THAT CONTAINS x (WITH PATH Compresion)
         int findParent(int x){
             //base case
             if(parent[x] == x)
@@ -119,8 +145,10 @@ class CityGraph{
             return parent[x];
         }
 
-        //UNIONING TWO SETS (UNION BY SIZE)
-        //attach the smaller tree under the larger one, returns true if a real union happened
+
+        //FOR UNIONING TWO SETS (UNION BY SIZE)
+        //attach the smaller tree under the larger one
+        //returns true if a real union happened
         bool unionSets(int x, int y){
             int rootX = findParent(x);
             int rootY = findParent(y);
@@ -128,6 +156,7 @@ class CityGraph{
             //already in the same set
             if(rootX == rootY)
                 return false;
+
             if(setSize[rootX] < setSize[rootY]){
                 parent[rootX] = rootY;
                 setSize[rootY] += setSize[rootX];
@@ -139,7 +168,8 @@ class CityGraph{
             return true;
         }
 
-        //SELECTION SORT ON THE EDGE INDICES, ASCENDING ON COST
+
+        //SELECTION SORT ON THE EDGE INDICES , ASCENDING ON COST
         //we sort indices not the edges so the original input order is not disturbed
         void sortEdgeIndicesByCost(vector<int>& indexList){
             int n = indexList.size();
@@ -157,11 +187,15 @@ class CityGraph{
             }
         }
 
-        //FINDING SHORTEST DISTANCES FROM S TO ALL NODES USING DIJKSTRA, using the MinHeap class 
+
+        //FOR FINDING SHORTEST DISTANCES FROM S TO ALL NODES USING DIJKSTRA
+        //uses the MinHeap class 
         void dijkstra(vector<vector<pair<int,int>>>& adj, int S, vector<int>& dist, vector<int>& prev){
             dist.assign(N, INT_MAX);
             prev.assign(N, -1);
+
             dist[S] = 0;
+
             MinHeap pq;
             pq.push(0, S);
 
@@ -169,13 +203,17 @@ class CityGraph{
                 pair<int,int> cur = pq.extractMin();
                 int d = cur.first;
                 int u = cur.second;
+
+                //stale entry , skip
                 if(d > dist[u])
                     continue;
-                int adjSz = adj[u].size();
 
+                //relax edges
+                int adjSz = adj[u].size();
                 for(int i=0; i<adjSz; i++){
                     int v = adj[u][i].first;
                     int w = adj[u][i].second;
+
                     if(dist[u] + w < dist[v]){
                         dist[v] = dist[u] + w;
                         prev[v] = u;
@@ -185,10 +223,13 @@ class CityGraph{
             }
         }
 
-        //REBUILDING THE ACTUAL PATH FROM S TO T USING prev[], returns an empty vector if T was unreachable
+
+        //FOR REBUILDING THE ACTUAL PATH FROM S TO T USING prev[]
+        //returns an empty vector if T was unreachable
         vector<int> reconstructPath(int T, vector<int>& prev, vector<int>& dist){
             vector<int> path;
 
+            //edge case
             if(dist[T] == INT_MAX)
                 return path;
 
@@ -206,19 +247,26 @@ class CityGraph{
                 path[i] = path[sz-1-i];
                 path[sz-1-i] = temp;
             }
+
             return path;
         }
 
-        //returns the shortest travel time from S to T, returns -1 if T is unreachable
+
+        //this function returns the shortest travel time from S to T
+        //returns -1 if T is unreachable
         int getPathTravelTime(vector<vector<pair<int,int>>>& adj, int S, int T){
             vector<int> dist, prev;
             dijkstra(adj, S, dist, prev);
+
             if(dist[T] == INT_MAX)
                 return -1;
             return dist[T];
         }
 
-        //Building adjFull FROM edges[]
+
+        //FOR Building adjFull FROM edges[]
+        //called once in the constructor , adjFull doesn't change after that
+        //bcs of this shortestPath works without calling buildMST first
         void buildFullAdjacency(){
             adjFull.assign(N, vector<pair<int,int>>());
             int n = edges.size();
@@ -229,7 +277,9 @@ class CityGraph{
             }
         }
 
-        //BUILDING adjMST FROM mstEdges[]
+
+        //FOR BUILDING adjMST FROM mstEdges[]
+        //called at the end of buildMST
         void buildMSTAdjacency(){
             adjMST.assign(N, vector<pair<int,int>>());
             int n = mstEdges.size();
@@ -240,8 +290,11 @@ class CityGraph{
             }
         }
 
-        //CHECKING CONNECTIVITY VIA BFS FROM NODE 0, returns how many nodes are rechable from node 0
+
+        //FOR CHECKING CONNECTIVITY VIA BFS FROM NODE 0
+        //returns how many nodes are rechable from node 0
         int countReachableFromZero(){
+            //temporary unweighted adj for BFS
             vector<vector<int>> tempAdj(N);
             int edgeSz = edges.size();
             for(int i=0; i<edgeSz; i++){
@@ -260,6 +313,7 @@ class CityGraph{
             while(front < qSz){
                 int cur = bfsQueue[front];
                 front++;
+
                 int adjSz = tempAdj[cur].size();
                 for(int i=0; i<adjSz; i++){
                     int neighbour = tempAdj[cur][i];
@@ -271,39 +325,53 @@ class CityGraph{
                     }
                 }
             }
+
             return reachedCount;
         }
 
+
     public:
+
+        //parameterized constructor
+        //adjFull is built here so shortestPath can work without buildMST
         CityGraph(int N, vector<Edge>& edges){
             this->N = N;
             this->edges = edges;
             mstCost = 0;
             mstBuilt = false;
+
             buildFullAdjacency();
         }
 
-        /*GRAPH VALIDATION POLICY:
-        1)self-loops are forbidden (u == v is rejected)
-        2)duplicate roads between same pair are forbidden
-        3)cost and travelTime must both be non-negative
-        4)every node id must lie in [0, N-1]
-        5)graph must be connected (BFS from node 0 must reach all N nodes)
+
+        /*
+        GRAPH VALIDATION POLICY:
+        1) self-loops are forbidden (u == v is rejected)
+        2) duplicate roads between same pair are forbidden
+        3) cost and travelTime must both be non-negative
+        4) every node id must lie in [0, N-1]
+        5) graph must be connected (BFS from node 0 must reach all N nodes)
         */
+
         bool validateGraph(){
             int edgeSz = edges.size();
             for(int i=0; i<edgeSz; i++){
                 int u = edges[i].u;
                 int v = edges[i].v;
 
+                //rule (1) 
                 if(u == v){
                     cout<<"INVALID -> edge "<<i<<" is a self-loop ("<<u<<" - "<<v<<")"<<endl;
                     return false;
                 }
+
+                //rule (4) 
                 if(u < 0 || u >= N || v < 0 || v >= N){
                     cout<<"INVALID -> edge "<<i<<" has a node id outside [0, "<<N-1<<"]"<<endl;
                     return false;
                 }
+
+                //rule (3)
                 if(edges[i].cost < 0){
                     cout<<"INVALID -> edge "<<i<<" ("<<u<<"-"<<v<<") has negative construction cost"<<endl;
                     return false;
@@ -313,6 +381,7 @@ class CityGraph{
                     return false;
                 }
 
+                //rule (2) 
                 for(int j=0; j<i; j++){
                     int prevU = edges[j].u;
                     int prevV = edges[j].v;
@@ -322,18 +391,23 @@ class CityGraph{
                     }
                 }
             }
+
+            //rule (5) 
             int reached = countReachableFromZero();
             if(reached < N){
                 cout<<"INVALID -> graph is disconnected ("<<reached<<"/"<<N
                     <<" nodes reachable from node 0)"<<endl;
                 return false;
             }
+
             cout<<"the input graph is VALID -> "<<N<<" intersections, "<<edges.size()<<" roads"<<endl;
             return true;
         }
 
-        //BUILDING THE MST USING KRUSKAL'S ALGORITHM
-        //SORT EDGES BY COST -> INIT DSU -> PROCESS EACH EDGE IN ORDER, ACCEPT IF IN DIFFERENT SETS , REJECT IF SAME SET (WOULD FORM A CYCLE)
+
+        //FOR BUILDING THE MST USING KRUSKAL'S ALGORITHM
+        //SORT EDGES BY COST -> INIT DSU -> PROCESS EACH EDGE IN ORDER
+        //ACCEPT IF IN DIFFERENT SETS , REJECT IF SAME SET (WOULD FORM A CYCLE)
         void buildMST(){
             cout<<endl;
             cout<<"BUILDING MST USING KRUSKAL'S ALGORITHM"<<endl;
@@ -344,12 +418,14 @@ class CityGraph{
                 indexList[i] = i;
 
             sortEdgeIndicesByCost(indexList);
+
             initDSU(N);
             mstCost = 0;
             mstEdges.clear();
 
             for(int k=0; k<edgeSz; k++){
                 Edge& e = edges[indexList[k]];
+
                 //same set means this edge would form a cyle
                 if(findParent(e.u) == findParent(e.v)){
                     cout<<"edge ("<<e.u<<" - "<<e.v<<") cost = "<<e.cost
@@ -363,9 +439,11 @@ class CityGraph{
                         <<" -> ACCEPTED [running MST cost = "<<mstCost<<"]"<<endl;
                 }
             }
+
             //fill adjMST so compareNetworks can use it
             buildMSTAdjacency();
             mstBuilt = true;
+
             cout<<endl;
             cout<<"FINAL MST -> total construction cost = "<<mstCost<<endl;
             int mstSz = mstEdges.size();
@@ -376,7 +454,9 @@ class CityGraph{
             }
         }
 
-        //FINDING THE SHORTEST TRAVEL TIME PATH FROM S TO T ON THE FULL GRAPH
+
+        //FOR FINDING THE SHORTEST TRAVEL TIME PATH FROM S TO T ON THE FULL GRAPH
+        //THIS WORKS INDEPENDENTLY OF buildMST , bcs adjFull IS BUILT IN THE CONSTRUCTOR
         void shortestPath(int S, int T){
             cout<<endl;
             cout<<"SHORTEST PATH FROM "<<S<<" TO "<<T<<endl;
@@ -392,6 +472,7 @@ class CityGraph{
 
             vector<int> dist, prev;
             dijkstra(adjFull, S, dist, prev);
+
             vector<int> path = reconstructPath(T, prev, dist);
 
             if(path.empty()){
@@ -407,29 +488,32 @@ class CityGraph{
                     cout<<" -> ";
             }
             cout<<endl;
+
             cout<<"per-hop travel time breakdown:"<<endl;
             int total = 0;
-
             for(int i=0; i<pathSz-1; i++){
                 int from = path[i];
                 int to = path[i+1];
+
                 //look up edge weight in adjFull
                 int hopTime = 0;
                 int adjSz = adjFull[from].size();
-
                 for(int j=0; j<adjSz; j++){
                     if(adjFull[from][j].first == to){
                         hopTime = adjFull[from][j].second;
                         break;
                     }
                 }
+
                 total += hopTime;
                 cout<<"   "<<from<<" -> "<<to<<" : "<<hopTime<<endl;
             }
             cout<<"total travel time -> "<<total<<endl;
         }
 
-        //COMPARING THE MST PATH TRAVEL TIME VS THE SHORTEST PATH TRAVEL TIME, if the MST path is slower we print the difference and the percentage
+
+        //FOR COMPARING THE MST PATH TRAVEL TIME VS THE SHORTEST PATH TRAVEL TIME
+        //if the MST path is slower we print the difference and the percentage
         void compareNetworks(int S, int T){
             cout<<endl;
             cout<<"COMPARISON OF MST PATH vs SHORTEST PATH (S = "<<S<<", T = "<<T<<")"<<endl;
@@ -438,10 +522,12 @@ class CityGraph{
                 cout<<"ERROR -> S or T is outside the valid range [0, "<<N-1<<"]"<<endl;
                 return;
             }
+
             if(!mstBuilt){
-                cout<<"ERROR -> MST has not been built yet, call buildMST() first"<<endl;
+                cout<<"ERROR -> MST has not been built yet , call buildMST() first"<<endl;
                 return;
             }
+
             int spTime = getPathTravelTime(adjFull, S, T);
             int mstTime = getPathTravelTime(adjMST, S, T);
 
@@ -449,8 +535,9 @@ class CityGraph{
                 cout<<"comparison not possible (no path exists in one of the two structures)"<<endl;
                 return;
             }
+
             cout<<"shortest path travel time on full graph -> "<<spTime<<endl;
-            cout<<"MST path travel time -> "<<mstTime<<endl;
+            cout<<"MST path travel time                    -> "<<mstTime<<endl;
 
             if(mstTime == spTime){
                 cout<<"result -> the MST path is exactly as fast as the shortest path"<<endl;
@@ -458,12 +545,12 @@ class CityGraph{
             else{
                 int diff = mstTime - spTime;
                 double pct = ((double)diff / spTime) * 100.0;
-                cout<<"result -> the MST path is slower by "<<diff<<" units ("<<pct<<"% more)"<<endl;
+                cout<<"result -> the MST path is slower by "<<diff
+                    <<" units ("<<pct<<"% more)"<<endl;
             }
         }
 
-        //FINDING THE CRITICAL ROADS IN THE MST
-        //a road is critical if removing it increases the MST cost (or disconnects the graph), we remove each MST edge one by one and rerun kruskal's to check
+        //FINDING THE CRITICAL ROADS IN THE MST, a road is critical if removing it increases the MST cost (or disconnects the graph), we remove each MST edge one by one and rerun kruskal's to check
         void criticalRoads(){
             cout<<endl;
             cout<<"CRITICAL ROADS ANALYSIS"<<endl;
@@ -472,27 +559,32 @@ class CityGraph{
                 cout<<"ERROR -> MST has not been built yet , call buildMST() first"<<endl;
                 return;
             }
+
             cout<<"removing each MST edge in turn and rebuilding the MST..."<<endl;
 
             int edgeSz = edges.size();
             vector<int> indexList(edgeSz);
             for(int i=0; i<edgeSz; i++)
                 indexList[i] = i;
-            sortEdgeIndicesByCost(indexList); 
-            bool anyCritical = false;
-            int mstSz = mstEdges.size();
+            sortEdgeIndicesByCost(indexList);
 
+            bool anyCritical = false;
+
+            int mstSz = mstEdges.size();
             for(int k=0; k<mstSz; k++){
                 Edge& removedEdge = mstEdges[k];
+
                 initDSU(N);
                 int newCost = 0;
                 int addedEdges = 0;
 
                 for(int i=0; i<edgeSz; i++){
                     Edge& e = edges[indexList[i]];
+
                     if((e.u == removedEdge.u && e.v == removedEdge.v) ||
                        (e.u == removedEdge.v && e.v == removedEdge.u))
                         continue;
+
                     if(findParent(e.u) != findParent(e.v)){
                         unionSets(e.u, e.v);
                         newCost += e.cost;
@@ -502,20 +594,23 @@ class CityGraph{
 
                 if(addedEdges < N - 1){
                     //graph becomes disconnected without this edge , thus critical
-                    cout<<"   ("<<removedEdge.u<<" - "<<removedEdge.v<<") cost = "<<removedEdge.cost<<" -> CRITICAL (graph becomes disconnected without this road)"<<endl;
+                    cout<<"   ("<<removedEdge.u<<" - "<<removedEdge.v<<") cost = "<<removedEdge.cost
+                        <<" -> CRITICAL (graph becomes disconnected without this road)"<<endl;
                     anyCritical = true;
                 }
                 else if(newCost > mstCost){
                     int impact = newCost - mstCost;
-                    cout<<"   ("<<removedEdge.u<<" - "<<removedEdge.v<<") cost = "<<removedEdge.cost<<" -> CRITICAL (MST cost increases by "<<impact<<", new MST cost = "<<newCost<<")"<<endl;
+                    cout<<"   ("<<removedEdge.u<<" - "<<removedEdge.v<<") cost = "<<removedEdge.cost
+                        <<" -> CRITICAL (MST cost increases by "<<impact
+                        <<", new MST cost = "<<newCost<<")"<<endl;
                     anyCritical = true;
                 }
                 else{
-                    //same cost alternative exists, thus not critical
-                    cout<<"   ("<<removedEdge.u<<" - "<<removedEdge.v<<") cost = "<<removedEdge.cost<<" -> NOT CRITICAL (a same-cost alternative exists)"<<endl;
+                    //a same cost alternative exists , thus not critical
+                    cout<<"   ("<<removedEdge.u<<" - "<<removedEdge.v<<") cost = "<<removedEdge.cost
+                        <<" -> NOT CRITICAL (a same-cost alternative exists)"<<endl;
                 }
             }
-
             if(!anyCritical){
                 cout<<"   no critical roads were found in this MST"<<endl;
             }
