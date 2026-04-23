@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <cstdlib>       //for rand and srand
+#include <cstdlib>
 
 using namespace std;
 
@@ -11,8 +11,6 @@ this struct represents one aid request
 1) requestID  -> unique identifier of the request
 2) priority   -> integer in [0, 100] , higher means more urgent
 3) timestamp  -> submission time of the request
-
-requests are stored inside a max-heap keyed on the priority field
 */
 struct Request{
     int requestID;
@@ -24,35 +22,24 @@ struct Request{
 
 /*
 this CLASS contains the code for:
-1) validating the input request list against the data handling policy
-2) building a max-heap from the input using bottom-up heapify
-3) dispatching the highest-priority request and restoring the heap property
-4) updating the priority of an existing request , in-place (no rebuild)
-5) sorting the records in-place using randomised quicksort (by priority or timestamp)
-6) returning the top k highest-priority requests WITHOUT modifying the live heap
+1) validating the input request list
+2) building the max-heap using bottom-up heapify
+3) dispatching the highest-priority request
+4) updating the priority of an existing request in-place
+5) sorting the records in-place using randomised quicksort (descending order)
+6) returning the top k highest-priority requests without touching the live heap
 
 data members:
-1) heap -> the max-heap is stored inside a vector which we treat as a 1D array
-          array based indexing: parent = (i-1)/2 , leftChild = 2i+1 , rightChild = 2i+2
+1) heap -> the max-heap stored inside a vector , treated as a 1D array
+   parent = (i-1)/2 , leftChild = 2i+1 , rightChild = 2i+2
 
-helper functions (private):
-1) swapNodes                 -> swaps two heap entries
-2) siftUp , siftDown         -> restore heap property after a single change
-3) findIndexByID             -> linear scan that returns the heap index of a request given its ID
-4) getKey                    -> returns priority or timestamp (used by quicksort)
-5) quicksortHelper           -> recursive randomised quicksort with Lomuto partition
-6) printHeap                 -> prints the heap as an array (used after every modification)
-
-SORT ORDER CONVENTION (sortRecords):
-    sortRecords sorts in DESCENDING order of the chosen key
-    (highest priority first for "priority" , latest timestamp first for "timestamp")
-    this matches the natural reading of a situation report at shift-end
-    enforced by the comparison (val >= pivotVal) inside the Lomuto partition
-
-TOP-K CONVENTION (topKRequests):
-    topKRequests returns a vector<Request> of the k highest-priority requests in decreasing order
-    the live heap (data member heap) is NEVER modified
-    we achieve this by copying heap into a local tempHeap and extracting the max k times from the copy
+helper functions:
+1) swapNodes            -> swaps two heap entries
+2) siftUp , siftDown    -> restore heap property after a single change
+3) findIndexByID        -> linear scan , returns the heap index of a given ID
+4) getKey               -> returns priority or timestamp (used by quicksort)
+5) quicksortHelper      -> recursive randomised quicksort with lomuto partition
+6) printHeap            -> prints the heap state after every modification
 */
 class DispatchCentre{
     private:
@@ -67,8 +54,7 @@ class DispatchCentre{
         }
 
 
-        //bubble heap[i] upwards as long as it is greater than its parent
-        //used after a priority increase
+        //FOR SIFTING A NODE UP WHILE IT IS GREATER THAN ITS PARENT
         void siftUp(int i){
             while(i > 0){
                 int parent = (i - 1) / 2;
@@ -82,9 +68,8 @@ class DispatchCentre{
         }
 
 
-        //push heap[i] downwards as long as one of its children is greater than it
-        //n -> effective size of the heap (so we don't read past the live region)
-        //used after replacing the root with the last element , or after a priority decrease
+        //FOR SIFTING A NODE DOWN WHILE IT IS SMALLER THAN ONE OF ITS CHILDREN
+        //n -> effective size of the heap
         void siftDown(int i, int n){
             while(true){
                 int largest = i;
@@ -107,9 +92,8 @@ class DispatchCentre{
         }
 
 
-        //LINEAR SCAN , returns the heap index of the request with the given ID
-        //returns -1 if no such request is present
-        //we do NOT maintain a separate ID -> index lookup table , this is a deliberate simplicity choice
+        //FOR FINDING THE HEAP INDEX OF A REQUEST (LINEAR SCAN)
+        //returns -1 if not found
         int findIndexByID(int reqID){
             for(int i=0; i<(int)heap.size(); i++){
                 if(heap[i].requestID == reqID)
@@ -119,8 +103,7 @@ class DispatchCentre{
         }
 
 
-        //returns the comparison key for one Request based on the sort key string
-        //used inside quicksortHelper
+        //this function returns the sort key (priority or timestamp)
         int getKey(Request& r, string& key){
             if(key == "priority")
                 return r.priority;
@@ -129,25 +112,15 @@ class DispatchCentre{
         }
 
 
-        /*
-        recursive RANDOMISED QUICKSORT using LOMUTO partition
-        - pick a random pivot index in [lo, hi]
-        - swap the pivot to arr[hi]
-        - scan from left to right and push elements GREATER THAN OR EQUAL TO the pivot to the front
-          (this is why the sort ends up in DESCENDING order)
-        - place the pivot in its final position and recurse on the two halves
-
-        purely IN-PLACE , no auxiliary array of size n is allocated
-        extra space is just the recursion stack , O(log n) on average
-
-        partitionCount is incremented at every partition step (only for the trace)
-        */
+        //RECURSIVE RANDOMISED QUICKSORT WITH LOMUTO PARTITION (DESCENDING ORDER)
+        //elements >= pivot are pushed to the front , thus result is descending
+        //purely in-place , only the recursion stack is used as extra space
         void quicksortHelper(vector<Request>& arr, int lo, int hi, string& key, int& partitionCount){
             //base case
             if(lo >= hi)
                 return;
 
-            //pick a random pivot index in [lo, hi] and move it to arr[hi]
+            //pick a random pivot and move it to arr[hi]
             int pivIdx = lo + (rand() % (hi - lo + 1));
             Request t1 = arr[pivIdx];
             arr[pivIdx] = arr[hi];
@@ -157,8 +130,7 @@ class DispatchCentre{
             cout<<"pivot = "<<pivotVal<<" (ID = "<<arr[hi].requestID
                 <<"), range = ["<<lo<<", "<<hi<<"]"<<endl;
 
-            //LOMUTO PARTITION for DESCENDING order
-            //we push elements >= pivot to the front of the window [lo, hi-1]
+            //lomuto partition for descending order
             int i = lo - 1;
             for(int j=lo; j<hi; j++){
                 int val = getKey(arr[j], key);
@@ -170,7 +142,7 @@ class DispatchCentre{
                 }
             }
 
-            //place the pivot at its final position (i+1)
+            //place the pivot at its final position
             int p = i + 1;
             Request t2 = arr[p];
             arr[p] = arr[hi];
@@ -179,13 +151,13 @@ class DispatchCentre{
             partitionCount++;
             cout<<"   -> partition boundary at index "<<p<<endl;
 
-            //recurse on the two halves , pivot is already at its final position p
+            //recurse on the two halves
             quicksortHelper(arr, lo, p - 1, key, partitionCount);
             quicksortHelper(arr, p + 1, hi, key, partitionCount);
         }
 
 
-        //prints the current heap as an array (used after every modification for traceability)
+        //this function prints the heap as an array
         void printHeap(){
             cout<<"   heap state -> [";
             for(int i=0; i<(int)heap.size(); i++){
@@ -205,12 +177,12 @@ class DispatchCentre{
 
         /*
         DATA HANDLING POLICY:
-        1) every request ID inside one input batch must be unique
+        1) every requestID inside one input batch must be unique
         2) priority must be an integer in [0, 100]
         3) duplicate request IDs are rejected at input time , with the offending ID reported
         4) out-of-range priorities are rejected at input time , with the offending value reported
-        5) inside updatePriority -> unknown ID and out-of-range new priority are both rejected
-           with a clear error message , the heap is left unchanged in both cases
+        5) updatePriority rejects unknown IDs and out-of-range new priorities ,
+           the heap is left unchanged in both cases
         */
 
         bool validateInput(vector<Request>& requests){
@@ -227,7 +199,6 @@ class DispatchCentre{
                 Request& r = requests[i];
 
                 //rule (3) - duplicate ID check
-                //O(n^2) double-loop scan over earlier requests , fine for assignment-size inputs
                 for(int j=0; j<i; j++){
                     if(requests[j].requestID == r.requestID){
                         cout<<"INVALID -> duplicate request ID "<<r.requestID
@@ -249,32 +220,24 @@ class DispatchCentre{
         }
 
 
-        /*
-        builds the max-heap from the input list using BOTTOM-UP HEAPIFY (Floyd's method)
-        - copy the input into the heap array
-        - start from the last non-leaf node (index n/2 - 1) and walk backwards to the root
-        - at every step , sift the current node downwards so that the subtree rooted at it is a valid max-heap
-
-        overall time is O(n) , much better than the O(n log n) of repeated insertion
-        every internal swap is printed for traceability
-        */
-
+        //FOR BUILDING THE MAX-HEAP USING BOTTOM-UP HEAPIFY (FLOYD'S METHOD)
+        //START FROM LAST NON-LEAF NODE AND WALK BACKWARDS TO THE ROOT
+        //OVERALL TIME IS O(n) , BETTER THAN O(n log n) OF REPEATED INSERTION
         void buildStructure(vector<Request>& requests){
             cout<<endl;
             cout<<"BUILDING MAX-HEAP USING BOTTOM-UP HEAPIFY"<<endl;
 
-            //copy the input into the heap array
             heap = requests;
             int n = heap.size();
 
-            //last non-leaf node is at index n/2 - 1 , start there and walk backwards
+            //start from the last non-leaf node and walk backwards
             int start = n / 2 - 1;
 
             for(int i=start; i>=0; i--){
                 cout<<"heapify at index "<<i<<" (ID = "<<heap[i].requestID
                     <<", priority = "<<heap[i].priority<<")"<<endl;
 
-                //verbose sift-down that prints every swap
+                //sift-down with tracing
                 int pos = i;
                 while(true){
                     int largest = pos;
@@ -307,17 +270,8 @@ class DispatchCentre{
         }
 
 
-        /*
-        removes and returns the highest-priority request (root of the heap)
-        steps:
-        1) save the root in a local variable (this will be returned)
-        2) replace heap[0] with the last element
-        3) shrink the heap by one
-        4) sift the new root down to restore the heap
-
-        returns the sentinel Request {-1, -1, -1} if the heap is empty
-        */
-
+        //FOR DISPATCHING THE HIGHEST PRIORITY REQUEST (ROOT OF THE HEAP)
+        //REPLACE ROOT WITH LAST ELEMENT , SHRINK THE HEAP , SIFT DOWN TO RESTORE
         Request dispatchNext(){
             cout<<endl;
             cout<<"DISPATCH NEXT"<<endl;
@@ -348,31 +302,20 @@ class DispatchCentre{
         }
 
 
-        /*
-        updates the priority of an existing request IN-PLACE (no rebuild)
-        steps:
-        1) validate the new priority against [0, 100] (rule 5)
-        2) locate the request by ID via findIndexByID (rule 5)
-        3) save the old priority , overwrite with the new value
-        4) if newPriority > oldPriority -> sift UP
-           if newPriority < oldPriority -> sift DOWN
-           if equal                     -> no movement needed
-
-        both invalid conditions (unknown ID , out-of-range priority) leave the heap unchanged
-        */
-
+        //FOR UPDATING THE PRIORITY OF AN EXISTING REQUEST IN-PLACE (NO REBUILD)
+        //LOCATE BY ID -> OVERWRITE PRIORITY -> SIFT UP OR DOWN
         void updatePriority(int reqID, int newPriority){
             cout<<endl;
             cout<<"UPDATE PRIORITY"<<endl;
 
-            //rule (5) - new priority range check
+            //rule (5) - range check
             if(newPriority < 0 || newPriority > 100){
                 cout<<"ERROR -> new priority "<<newPriority
                     <<" is outside the valid range [0, 100]"<<endl;
                 return;
             }
 
-            //rule (5) - locate the request by ID
+            //rule (5) - find the request by ID
             int idx = findIndexByID(reqID);
             if(idx == -1){
                 cout<<"ERROR -> request ID "<<reqID<<" is not present in the heap"<<endl;
@@ -394,6 +337,7 @@ class DispatchCentre{
                 siftDown(idx, (int)heap.size());
             }
             else{
+                //no change in priority , thus no movement
                 cout<<"  -> no movement (priority unchanged)"<<endl;
             }
 
@@ -401,19 +345,9 @@ class DispatchCentre{
         }
 
 
-        /*
-        sorts the records IN-PLACE in DESCENDING order of the chosen key
-        - key = "priority"   -> highest priority first
-        - key = "timestamp"  -> latest timestamp first
-
-        implementation uses randomised quicksort with Lomuto partition
-        - average time O(n log n) , worst case O(n^2)
-        - auxiliary space O(log n) from the recursion stack ONLY (no auxiliary array of size n)
-
-        records are passed BY REFERENCE so the caller's vector is modified directly
-        a fixed seed is used so that the pivot/partition trace is reproducible
-        */
-
+        //FOR SORTING RECORDS IN-PLACE BY "priority" OR "timestamp" (DESCENDING ORDER)
+        //RANDOMISED QUICKSORT WITH LOMUTO PARTITION
+        //AVERAGE TIME O(n log n) , O(log n) AUXILIARY SPACE FROM RECURSION STACK ONLY
         void sortRecords(vector<Request>& records, string key){
             cout<<endl;
             cout<<"SORTING RECORDS BY \""<<key<<"\" USING RANDOMISED QUICKSORT (DESCENDING ORDER)"<<endl;
@@ -423,7 +357,7 @@ class DispatchCentre{
                 return;
             }
 
-            srand(42);       //fixed seed for reproducibility of the trace
+            srand(42);       //fixed seed , trace will be same every run
             int partitionCount = 0;
 
             quicksortHelper(records, 0, (int)records.size() - 1, key, partitionCount);
@@ -438,21 +372,8 @@ class DispatchCentre{
         }
 
 
-        /*
-        returns the k highest-priority requests in DECREASING order of priority
-        the live heap (data member heap) is NOT modified
-
-        mechanism:
-        1) copy the live heap into a local tempHeap
-        2) run k extract-max operations on tempHeap
-        3) collect the extracted elements into the returned result vector
-        4) also print the same list (problem statement asks for both)
-
-        edge cases:
-        - k <= 0                -> empty vector is returned , a note is printed
-        - k > current heap size -> k is clamped to heap.size() , a note is printed
-        */
-
+        //FOR RETURNING THE k HIGHEST PRIORITY REQUESTS WITHOUT TOUCHING THE LIVE HEAP
+        //we work on a local copy tempHeap and extract the max k times from it
         vector<Request> topKRequests(int k){
             cout<<endl;
             cout<<"TOP "<<k<<" REQUESTS"<<endl;
@@ -469,22 +390,22 @@ class DispatchCentre{
                 k = (int)heap.size();
             }
 
-            //work on a COPY so the live heap is not modified
+            //work on a copy , live heap is not touched
             vector<Request> tempHeap = heap;
             int n = tempHeap.size();
 
             for(int t=0; t<k; t++){
-                //the current max sits at index 0 of tempHeap
+                //current max is at index 0
                 result.push_back(tempHeap[0]);
                 cout<<"   "<<(t+1)<<". ID = "<<tempHeap[0].requestID
                     <<", Priority = "<<tempHeap[0].priority<<endl;
 
-                //remove it by replacing root with the last element and sifting down
+                //replace root with last element and sift down
                 if(n > 1){
                     tempHeap[0] = tempHeap[n-1];
                     n--;
 
-                    //local sift-down on tempHeap (siftDown helper operates on this->heap so we redo it here)
+                    //local sift-down on tempHeap
                     int pos = 0;
                     while(true){
                         int largest = pos;
@@ -522,33 +443,37 @@ int main(){
 
     //TEST CASE 1 - basic demo , five requests
     cout<<"TEST CASE 1\n";
- 
+
     vector<Request> reqs1 = {
         {101, 45, 1}, {102, 80, 2}, {103, 35, 3},
         {104, 90, 4}, {105, 60, 5}
     };
- 
+
     DispatchCentre dc1;
- 
+
     if(dc1.validateInput(reqs1)){
         dc1.buildStructure(reqs1);
- 
+
         //dispatch the highest-priority request
         dc1.dispatchNext();
- 
+
         //raise a low-priority request , should move UP
         dc1.updatePriority(103, 72);
- 
+
         //try to update an ID that is not present (should be rejected)
         dc1.updatePriority(999, 50);
- 
+
         //peek at the top 2 without modifying the live heap
         vector<Request> top2 = dc1.topKRequests(2);
         cout<<"   (returned vector contains "<<top2.size()<<" requests)"<<endl;
- 
-        //sort an independent copy by priority , descending
+
+        //sort by priority , descending
         vector<Request> sortCopy1 = reqs1;
         dc1.sortRecords(sortCopy1, "priority");
+
+        //sort by timestamp , descending
+        vector<Request> sortCopy2 = reqs1;
+        dc1.sortRecords(sortCopy2, "timestamp");
     }
 
 
