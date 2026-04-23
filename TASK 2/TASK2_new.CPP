@@ -21,40 +21,61 @@ struct Request{
 
 
 /*
-this CLASS contains the code for:
-1) validating the input request list
-2) building the max-heap using bottom-up heapify
-3) dispatching the highest-priority request
-4) updating the priority of an existing request in-place
-5) sorting the records in-place using randomised quicksort (descending order)
-6) returning the top k highest-priority requests without touching the live heap
+this class is the max-heap for storing Request objects
+keyed on the priority field
 */
-class DispatchCentre{
+class MaxHeap{
     private:
-        vector<Request> heap;
+        vector<Request> data;
 
+    public:
 
-        //swap heap[i] and heap[j]
-        void swapNodes(int i, int j){
-            Request temp = heap[i];
-            heap[i] = heap[j];
-            heap[j] = temp;
+        MaxHeap(){}
+
+        int size(){
+            return data.size();
         }
 
+        bool empty(){
+            return data.empty();
+        }
+
+        Request& top(){
+            return data[0];
+        }
+
+        Request& at(int i){
+            return data[i];
+        }
+
+        void popBack(){
+            data.pop_back();
+        }
+
+        //returns a copy of the internal data (used by topKRequests)
+        vector<Request> getData(){
+            return data;
+        }
+
+        //swap data[i] and data[j]
+        void swapNodes(int i, int j){
+            Request temp = data[i];
+            data[i] = data[j];
+            data[j] = temp;
+        }
 
         //FOR SIFTING A NODE UP WHILE IT IS GREATER THAN ITS PARENT
         void siftUp(int i){
             while(i > 0){
-                int parent = (i - 1) / 2;
-                if(heap[i].priority > heap[parent].priority){
-                    swapNodes(i, parent);
-                    i = parent;
+                int par = (i - 1) / 2;
+                if(data[i].priority > data[par].priority){
+                    swapNodes(i, par);
+                    i = par;
                 }
                 else
                     break;
             }
         }
-
 
         //FOR SIFTING A NODE DOWN WHILE IT IS SMALLER THAN ONE OF ITS CHILDREN
         //n -> effective size of the heap
@@ -64,10 +85,9 @@ class DispatchCentre{
                 int leftChild = 2 * i + 1;
                 int rightChild = 2 * i + 2;
 
-                if(leftChild < n && heap[leftChild].priority > heap[largest].priority)
+                if(leftChild < n && data[leftChild].priority > data[largest].priority)
                     largest = leftChild;
-
-                if(rightChild < n && heap[rightChild].priority > heap[largest].priority)
+                if(rightChild < n && data[rightChild].priority > data[largest].priority)
                     largest = rightChild;
 
                 if(largest != i){
@@ -79,16 +99,93 @@ class DispatchCentre{
             }
         }
 
-
-        //FOR FINDING THE HEAP INDEX OF A REQUEST (LINEAR SCAN)
+        //FOR FINDING THE INDEX OF A REQUEST GIVEN ITS ID (Linear scan)
         //returns -1 if not found
-        int findIndexByID(int reqID){
-            for(int i=0; i<(int)heap.size(); i++){
-                if(heap[i].requestID == reqID)
+        int findByID(int reqID){
+            int n = data.size();
+            for(int i=0; i<n; i++){
+                if(data[i].requestID == reqID)
                     return i;
             }
             return -1;
         }
+
+        //this function prints the heap as an array
+        void printState(){
+            cout<<"   heap state -> [";
+            int n = data.size();
+            for(int i=0; i<n; i++){
+                cout<<"(ID = "<<data[i].requestID<<", P = "<<data[i].priority<<")";
+                if(i < n-1)
+                    cout<<", ";
+            }
+            cout<<"]"<<endl;
+        }
+
+        //FOR BUILDING THE MAX-HEAP USING BOTTOM-UP HEAPIFY
+        //START FROM LAST NON-LEAF NODE AND WALK BACKWARDS TO THE ROOT
+        //OVERALL TIME IS O(n) , BETTER THAN O(n log n) OF REPEATED INSERTION
+        void buildHeap(vector<Request>& requests){
+            cout<<endl;
+            cout<<"BUILDING MAX-HEAP USING BOTTOM-UP HEAPIFY"<<endl;
+
+            data = requests;
+            int n = size();
+
+            //start from the last non-leaf node and walk backwards
+            int start = n / 2 - 1;
+
+            for(int i=start; i>=0; i--){
+                cout<<"heapify at index "<<i<<" (ID = "<<at(i).requestID
+                    <<", priority = "<<at(i).priority<<")"<<endl;
+
+                //sift-down with tracing
+                int pos = i;
+                while(true){
+                    int largest = pos;
+                    int leftChild = 2 * pos + 1;
+                    int rightChild = 2 * pos + 2;
+
+                    if(leftChild < n && at(leftChild).priority > at(largest).priority)
+                        largest = leftChild;
+
+                    if(rightChild < n && at(rightChild).priority > at(largest).priority)
+                        largest = rightChild;
+
+                    if(largest != pos){
+                        cout<<"   swap -> ID = "<<at(pos).requestID<<" (P = "<<at(pos).priority
+                            <<")  with  ID = "<<at(largest).requestID
+                            <<" (P = "<<at(largest).priority<<")"<<endl;
+                        swapNodes(pos, largest);
+                        pos = largest;
+                    }
+                    else{
+                        cout<<"   no swap needed at this level"<<endl;
+                        break;
+                    }
+                }
+            }
+
+            cout<<endl;
+            cout<<"heap construction complete"<<endl;
+            printState();
+        }
+};
+
+
+
+/*
+this CLASS contains the code for:
+1) validating the input request list
+2) building the max-heap using bottom-up heapify
+3) dispatching the highest-priority request
+4) updating the priority of an existing request in-place
+5) sorting the records in-place using randomised quicksort (descending order)
+6) returning the top k highest-priority requests without touching the live heap
+*/
+class DispatchCentre{
+    private:
+        MaxHeap heap;
 
 
         //this function returns the sort key (priority or timestamp)
@@ -100,8 +197,22 @@ class DispatchCentre{
         }
 
 
-        //RECURSIVE RANDOMISED QUICKSORT (DESCENDING ORDER)
-        //elements >= pivot are pushed to the front , thus result is descending
+        //FOR REVERSING AN ARRAY IN PLACE
+        void reverseArr(vector<Request>& arr){
+            int lo = 0;
+            int hi = arr.size() - 1;
+            while(lo < hi){
+                Request temp = arr[lo];
+                arr[lo] = arr[hi];
+                arr[hi] = temp;
+                lo++;
+                hi--;
+            }
+        }
+
+
+        //RECURSIVE RANDOMISED QUICKSORT (ASCENDING ORDER)
+        //after this we reverse the array to get descending order
         void quicksortHelper(vector<Request>& arr, int lo, int hi, string& key, int& partitionCount){
             //base case
             if(lo >= hi)
@@ -117,11 +228,10 @@ class DispatchCentre{
             cout<<"pivot = "<<pivotVal<<" (ID = "<<arr[hi].requestID
                 <<"), range = ["<<lo<<", "<<hi<<"]"<<endl;
 
-            //lomuto partition for descending order
             int i = lo - 1;
             for(int j=lo; j<hi; j++){
                 int val = getKey(arr[j], key);
-                if(val >= pivotVal){
+                if(val <= pivotVal){
                     i++;
                     Request t = arr[i];
                     arr[i] = arr[j];
@@ -144,18 +254,6 @@ class DispatchCentre{
         }
 
 
-        //this function prints the heap as an array
-        void printHeap(){
-            cout<<"   heap state -> [";
-            for(int i=0; i<heap.size(); i++){
-                cout<<"(ID = "<<heap[i].requestID<<", P = "<<heap[i].priority<<")";
-                if(i < (int)heap.size() - 1)
-                    cout<<", ";
-            }
-            cout<<"]"<<endl;
-        }
-
-
     public:
 
         //default constructor
@@ -173,7 +271,8 @@ class DispatchCentre{
         */
 
         bool validateInput(vector<Request>& requests){
-            for(int i=0; i<requests.size(); i++){
+            int n = requests.size();
+            for(int i=0; i<n; i++){
                 Request& r = requests[i];
 
                 //rule (3)
@@ -185,7 +284,7 @@ class DispatchCentre{
                     }
                 }
 
-                //rule (4) 
+                //rule (4)
                 if(r.priority < 0 || r.priority > 100){
                     cout<<"INVALID -> request ID "<<r.requestID<<" has priority "<<r.priority
                         <<" (must lie in [0, 100])"<<endl;
@@ -198,53 +297,9 @@ class DispatchCentre{
         }
 
 
-        //FOR BUILDING THE MAX-HEAP USING BOTTOM-UP HEAPIFy
-        //START FROM LAST NON-LEAF NODE AND WALK BACKWARDS TO THE ROOT
-        //OVERALL TIME IS O(n) , BETTER THAN O(n log n) OF REPEATED INSERTION
+        //FOR BUILDING THE MAX-HEAP USING BOTTOM-UP HEAPIFY
         void buildStructure(vector<Request>& requests){
-            cout<<endl;
-            cout<<"BUILDING MAX-HEAP USING BOTTOM-UP HEAPIFY"<<endl;
-
-            heap = requests;
-            int n = heap.size();
-
-            //start from the last non-leaf node and walk backwards
-            int start = n / 2 - 1;
-
-            for(int i=start; i>=0; i--){
-                cout<<"heapify at index "<<i<<" (ID = "<<heap[i].requestID
-                    <<", priority = "<<heap[i].priority<<")"<<endl;
-
-                //sift-down with tracing
-                int pos = i;
-                while(true){
-                    int largest = pos;
-                    int leftChild = 2 * pos + 1;
-                    int rightChild = 2 * pos + 2;
-
-                    if(leftChild < n && heap[leftChild].priority > heap[largest].priority)
-                        largest = leftChild;
-
-                    if(rightChild < n && heap[rightChild].priority > heap[largest].priority)
-                        largest = rightChild;
-
-                    if(largest != pos){
-                        cout<<"   swap -> ID = "<<heap[pos].requestID<<" (P = "<<heap[pos].priority
-                            <<")  with  ID = "<<heap[largest].requestID
-                            <<" (P = "<<heap[largest].priority<<")"<<endl;
-                        swapNodes(pos, largest);
-                        pos = largest;
-                    }
-                    else{
-                        cout<<"   no swap needed at this level"<<endl;
-                        break;
-                    }
-                }
-            }
-
-            cout<<endl;
-            cout<<"heap construction complete"<<endl;
-            printHeap();
+            heap.buildHeap(requests);
         }
 
 
@@ -260,22 +315,22 @@ class DispatchCentre{
                 return none;
             }
 
-            Request top = heap[0];
+            Request top = heap.top();
             cout<<"dispatched -> ID = "<<top.requestID<<", Priority = "<<top.priority
                 <<", Timestamp = "<<top.timestamp<<endl;
 
             int n = heap.size();
             if(n > 1){
-                heap[0] = heap[n-1];
-                heap.pop_back();
-                siftDown(0, (int)heap.size());
+                heap.at(0) = heap.at(n-1);
+                heap.popBack();
+                heap.siftDown(0, heap.size());
             }
             else{
-                heap.pop_back();
+                heap.popBack();
             }
 
             cout<<"after restoration:"<<endl;
-            printHeap();
+            heap.printState();
             return top;
         }
 
@@ -286,40 +341,38 @@ class DispatchCentre{
             cout<<endl;
             cout<<"UPDATE PRIORITY"<<endl;
 
-            //rule (5) 
             if(newPriority < 0 || newPriority > 100){
                 cout<<"ERROR -> new priority "<<newPriority
                     <<" is outside the valid range [0, 100]"<<endl;
                 return;
             }
 
-            //rule (5) 
-            int idx = findIndexByID(reqID);
+            int idx = heap.findByID(reqID);
             if(idx == -1){
                 cout<<"ERROR -> request ID "<<reqID<<" is not present in the heap"<<endl;
                 return;
             }
 
-            int oldPriority = heap[idx].priority;
-            heap[idx].priority = newPriority;
+            int oldPriority = heap.at(idx).priority;
+            heap.at(idx).priority = newPriority;
 
             cout<<"ID = "<<reqID<<" : old priority = "<<oldPriority
                 <<", new priority = "<<newPriority;
 
             if(newPriority > oldPriority){
                 cout<<"  -> moving UP"<<endl;
-                siftUp(idx);
+                heap.siftUp(idx);
             }
             else if(newPriority < oldPriority){
                 cout<<"  -> moving DOWN"<<endl;
-                siftDown(idx, (int)heap.size());
+                heap.siftDown(idx, heap.size());
             }
             else{
                 //no change in priority , thus no movement
                 cout<<"  -> no movement (priority unchanged)"<<endl;
             }
 
-            printHeap();
+            heap.printState();
         }
 
 
@@ -336,19 +389,22 @@ class DispatchCentre{
             srand(42);       //fixed seed
             int partitionCount = 0;
 
-            quicksortHelper(records, 0, (int)records.size() - 1, key, partitionCount);
+            quicksortHelper(records, 0, records.size()-1, key, partitionCount);
+            //reverse in-place to convert ascending result to descending
+            reverseArr(records);
 
             cout<<endl;
             cout<<"total partitions performed -> "<<partitionCount<<endl;
             cout<<"sorted result (descending on "<<key<<"):"<<endl;
-            for(int i=0; i<(int)records.size(); i++){
+            int n = records.size();
+            for(int i=0; i<n; i++){
                 cout<<"   ID = "<<records[i].requestID<<", priority = "<<records[i].priority
                     <<", timestamp = "<<records[i].timestamp<<endl;
             }
         }
 
 
-        //FOR RETURNING THE k HIGHEST PRIORITY REQUESTS WITHOUT TOUCHING THE LIVE HEAP
+        //FOR RETURNING THE k HIGHEST PRIORITY REQUESTS
         vector<Request> topKRequests(int k){
             cout<<endl;
             cout<<"TOP "<<k<<" REQUESTS"<<endl;
@@ -359,48 +415,27 @@ class DispatchCentre{
                 cout<<"k <= 0 , nothing to return"<<endl;
                 return result;
             }
-            if(k > (int)heap.size()){
-                cout<<"note -> k = "<<k<<" exceeds current heap size ("<<heap.size()
+            int heapSz = heap.size();
+            if(k > heapSz){
+                cout<<"note -> k = "<<k<<" exceeds current heap size ("<<heapSz
                     <<"), returning all available"<<endl;
-                k = (int)heap.size();
+                k = heapSz;
             }
 
-            vector<Request> tempHeap = heap;
+            MaxHeap tempHeap = heap;
             int n = tempHeap.size();
 
             for(int t=0; t<k; t++){
                 //current max is at index 0
-                result.push_back(tempHeap[0]);
-                cout<<"   "<<(t+1)<<". ID = "<<tempHeap[0].requestID
-                    <<", Priority = "<<tempHeap[0].priority<<endl;
+                result.push_back(tempHeap.top());
+                cout<<"   "<<(t+1)<<". ID = "<<tempHeap.top().requestID
+                    <<", Priority = "<<tempHeap.top().priority<<endl;
 
                 //replace root with last element and sift down
                 if(n > 1){
-                    tempHeap[0] = tempHeap[n-1];
+                    tempHeap.at(0) = tempHeap.at(n-1);
                     n--;
-
-                    //local sift-down on tempHeap
-                    int pos = 0;
-                    while(true){
-                        int largest = pos;
-                        int leftChild = 2 * pos + 1;
-                        int rightChild = 2 * pos + 2;
-
-                        if(leftChild < n && tempHeap[leftChild].priority > tempHeap[largest].priority)
-                            largest = leftChild;
-
-                        if(rightChild < n && tempHeap[rightChild].priority > tempHeap[largest].priority)
-                            largest = rightChild;
-
-                        if(largest != pos){
-                            Request t3 = tempHeap[pos];
-                            tempHeap[pos] = tempHeap[largest];
-                            tempHeap[largest] = t3;
-                            pos = largest;
-                        }
-                        else
-                            break;
-                    }
+                    tempHeap.siftDown(0, n);
                 }
                 else{
                     n--;
@@ -442,7 +477,7 @@ int main(){
     }
 
 
-    //TEST CASE 2 
+    //TEST CASE 2
     cout<<"\n\nTEST CASE 2\n";
 
     vector<Request> reqs2 = {
