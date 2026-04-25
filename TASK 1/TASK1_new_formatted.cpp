@@ -37,6 +37,7 @@ class MinHeap{
         }
 
         //FOR SIFTING A Pair UP WHILE IT IS SMALLER THAN ITS PARENT
+        //used when inserting a element into the minheap
         void siftUp(int i){
             while(i > 0){
                 int par = (i-1)/2;
@@ -50,6 +51,7 @@ class MinHeap{
         }
 
         //FOR SIFTING A PAIR DOWN WHILE IT IS LARGER THAN ONE OF ITS CHILDREN
+        //when deleting a element from the minheap
         void siftDown(int i){
             int n = data.size();
             while(true){
@@ -170,7 +172,6 @@ class CityGraph{
 
 
         //SELECTION SORT ON THE EDGE INDICES , ASCENDING ON COST
-        //we sort indices not the edges so the original input order is not disturbed
         void sortEdgeIndicesByCost(vector<int>& indexList){
             int n = indexList.size();
             for(int i=0; i<n-1; i++){
@@ -204,11 +205,9 @@ class CityGraph{
                 int d = cur.first;
                 int u = cur.second;
 
-                //stale entry , skip
                 if(d > dist[u])
                     continue;
 
-                //relax edges
                 int adjSz = adj[u].size();
                 for(int i=0; i<adjSz; i++){
                     int v = adj[u][i].first;

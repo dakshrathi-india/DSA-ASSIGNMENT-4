@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <climits>
+#include <algorithm>
 using namespace std;
 
 /*struct represents one road in the city graph
@@ -139,22 +140,12 @@ class CityGraph{
             return true;
         }
 
-        //SELECTION SORT ON THE EDGE INDICES, ASCENDING ON COST
+        //STL SORT ON THE EDGE INDICES, ASCENDING ON COST
         //we sort indices not the edges so the original input order is not disturbed
         void sortEdgeIndicesByCost(vector<int>& indexList){
-            int n = indexList.size();
-            for(int i=0; i<n-1; i++){
-                int minIdx = i;
-                for(int j=i+1; j<n; j++){
-                    if(edges[indexList[j]].cost < edges[indexList[minIdx]].cost)
-                        minIdx = j;
-                }
-                if(minIdx != i){
-                    int temp = indexList[i];
-                    indexList[i] = indexList[minIdx];
-                    indexList[minIdx] = temp;
-                }
-            }
+            sort(indexList.begin(), indexList.end(), [&](int a, int b){
+                return edges[a].cost < edges[b].cost;
+            });
         }
 
         //FINDING SHORTEST DISTANCES FROM S TO ALL NODES USING DIJKSTRA, using the MinHeap class 
